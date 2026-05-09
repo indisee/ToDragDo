@@ -6,6 +6,11 @@ import ToDragDoCore
 /// Lets a drag land "at the end" of the current folder, since `ItemRow`
 /// only accepts drops as "place before this row."
 struct EndDropZone: View {
+    /// Vertical footprint of the drop zone. Exposed so callers can
+    /// reserve the same slot when the zone itself is omitted (e.g. on
+    /// intermediate pages of a paginated list).
+    static let reservedHeight: CGFloat = 14
+
     @Environment(\.theme) private var theme
     @Environment(Repository.self) private var repository
 
@@ -13,7 +18,7 @@ struct EndDropZone: View {
 
     var body: some View {
         Color.clear
-            .frame(height: 14)
+            .frame(height: Self.reservedHeight)
             .contentShape(Rectangle())
             .overlay(alignment: .top) {
                 if isTargeted {

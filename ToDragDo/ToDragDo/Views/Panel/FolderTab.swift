@@ -21,10 +21,16 @@ struct FolderTab: View {
             HStack(spacing: 6) {
                 Text(folder.displayName)
                     .font(.system(size: theme.captionSize, weight: .semibold))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .layoutPriority(isSelected ? 1 : 0)
                 if let count {
                     Text("\(count)")
                         .font(.system(size: theme.captionSize - 1, weight: .bold))
                         .foregroundStyle(isSelected ? .white : .secondary)
+                        .lineLimit(1)
+                        .fixedSize()
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
                         .background(

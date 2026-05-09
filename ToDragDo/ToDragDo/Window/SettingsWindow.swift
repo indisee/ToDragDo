@@ -27,10 +27,11 @@ final class SettingsWindow {
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
             window.isRestorable = false
-            window.sharingType = .none
+            window.sharingType = settings.hideFromScreenSharing ? .none : .readOnly
             window.center()
             self.window = window
         }
+        window?.sharingType = settings.hideFromScreenSharing ? .none : .readOnly
         NSApp.activate()
         window?.makeKeyAndOrderFront(nil)
     }

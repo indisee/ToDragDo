@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import ToDragDoCore
 import UniformTypeIdentifiers
@@ -60,11 +61,10 @@ struct ItemRow: View {
         VStack(alignment: .leading, spacing: 0) {
             if isReceivingDrop {
                 Color.clear.frame(minHeight: theme.rowHeight)
+            } else if isExpanded {
+                expandedBody
             } else {
                 mainRow
-                if isExpanded, !payload.attachments.isEmpty {
-                    attachmentPreviews
-                }
             }
         }
         .background(rowBackground)
@@ -137,7 +137,7 @@ struct ItemRow: View {
         } else if isExpanded {
             floatingActionPanel
                 .padding(.trailing, 8)
-                .offset(y: -16)
+                .offset(y: -20)
         } else if isHovered {
             collapsedHoverActions
                 .padding(.trailing, 8)
@@ -181,6 +181,30 @@ struct ItemRow: View {
     private var hoverPanelHeight: CGFloat { theme.bodySize + 14 }
 
     // MARK: - Expanded body
+
+    /// Open row body. The mainRow + attachment previews live inside a
+    /// ScrollView capped at `theme.expandedMaxHeight` so a long note or
+    /// many image attachments scroll internally instead of stretching
+    /// the panel beyond the screen.
+    ///
+    /// The hidden `ScrollerStyleProbe` inside the content walks up to
+    /// the enclosing `NSScrollView` and forces overlay/.mini scrollers
+    /// — SwiftUI exposes no API for indicator width, so this is the
+    /// least invasive way to keep the bar slim regardless of the user's
+    /// "Show scroll bars" system preference.
+    private var expandedBody: some View {
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: 0) {
+                mainRow
+                if !payload.attachments.isEmpty {
+                    attachmentPreviews
+                }
+            }
+            .background(ScrollerStyleProbe())
+        }
+        .frame(maxHeight: theme.expandedMaxHeight)
+        .scrollIndicators(.automatic)
+    }
 
     private var attachmentPreviews: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -263,6 +287,54 @@ struct ItemRow: View {
             } catch {
                 print("ItemRow action failed: \(error)")
             }
+        }
+    }
+}
+
+// MARK: - Scroller customization
+
+/// Zero-size probe that finds its enclosing `NSScrollView` and forces
+/// overlay-style scrollers at `.mini` control size. SwiftUI doesn't
+/// expose a knob for indicator width, and on systems set to "Show
+/// scroll bars: Always" the legacy thick scroller would otherwise eat
+/// noticeable horizontal space inside the row.
+private struct ScrollerStyleProbe: NSViewRepresentable {
+    func makeNSView(context: Context) -> NSView { ProbeView() }
+    func updateNSView(_ nsView: NSView, context: Context) {
+        (nsView as? ProbeView)?.applyStyle()
+    }
+
+    private final class ProbeView: NSView {
+        override init(frame frameRect: NSRect) {
+            super.init(frame: frameRect)
+            translatesAutoresizingMaskIntoConstraints = false
+        }
+        required init?(coder: NSCoder) { fatalError() }
+
+        override var intrinsicContentSize: NSSize { .zero }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            applyStyle()
+        }
+
+        override func viewDidMoveToSuperview() {
+            super.viewDidMoveToSuperview()
+            applyStyle()
+        }
+
+        func applyStyle() {
+            var ancestor: NSView? = superview
+            while let current = ancestor, !(current is NSScrollView) {
+                ancestor = current.superview
+            }
+            guard let scroll = ancestor as? NSScrollView else { return }
+            scroll.scrollerStyle = .overlay
+            scroll.autohidesScrollers = true
+            scroll.verticalScroller?.scrollerStyle = .overlay
+            scroll.verticalScroller?.controlSize = .mini
+            scroll.horizontalScroller?.scrollerStyle = .overlay
+            scroll.horizontalScroller?.controlSize = .mini
         }
     }
 }

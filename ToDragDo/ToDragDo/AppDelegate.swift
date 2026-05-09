@@ -28,16 +28,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         for window in NSApp.windows where !(window is NSPanel) {
             window.close()
         }
-        for window in NSApp.windows {
-            window.sharingType = .none
-        }
+        Self.applySharingPolicyToAllWindows()
         windowObserver = NotificationCenter.default.addObserver(
             forName: NSWindow.didBecomeKeyNotification,
             object: nil,
             queue: .main
         ) { notification in
-            (notification.object as? NSWindow)?.sharingType = .none
+            MainActor.assumeIsolated {
+                (notification.object as? NSWindow)?.sharingType = Self.currentSharingType
+            }
         }
+    }
+
+    /// Re-applies the current `hideFromScreenSharing` setting to every
+    /// window the app currently has, including windows AppKit may have
+    /// created on our behalf. Called by the SwiftUI tree whenever the
+    /// setting changes.
+    @MainActor
+    static func applySharingPolicyToAllWindows() {
+        let policy = currentSharingType
+        for window in NSApp.windows {
+            window.sharingType = policy
+        }
+    }
+
+    @MainActor
+    private static var currentSharingType: NSWindow.SharingType {
+        AppSettings.hideFromScreenSharing() ? .none : .readOnly
     }
 
     func applicationWillTerminate(_ notification: Notification) {

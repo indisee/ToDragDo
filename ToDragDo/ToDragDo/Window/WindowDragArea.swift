@@ -45,60 +45,70 @@ private final class DragNSView: NSView {
 
 /// Vertical strip on the right edge that resizes the panel's width via
 /// drag. Kept narrow (6pt) so it doesn't steal hits from the list rows.
-/// Width-only — height is driven by SwiftUI's ideal size and must not
-/// be touched here, or we lose the auto-hug behavior.
+///
+/// The handle does not touch the window frame directly — the panel's
+/// `NSHostingController` is in `.preferredContentSize` mode, so the
+/// window auto-fits SwiftUI's ideal size. Mutating the frame here would
+/// be reverted on the next layout pass. Instead, the handle reports a
+/// new desired width through `onResize`; the caller stores that on
+/// `AppSettings`, and `PanelView` re-applies it via `.frame(width:)`,
+/// which triggers the controller to resize the window.
 struct WidthResizeHandle: NSViewRepresentable {
     let minWidth: CGFloat
     let maxWidth: CGFloat
+    /// Called with the clamped desired width while the handle is dragged.
+    let onResize: (CGFloat) -> Void
+    /// Returns the current width to anchor the drag against. Read once
+    /// at `mouseDown` so subsequent SwiftUI re-renders don't shift the
+    /// reference under the cursor.
+    let currentWidth: () -> CGFloat
 
     func makeNSView(context: Context) -> NSView {
-        ResizeNSView(minWidth: minWidth, maxWidth: maxWidth)
+        let view = ResizeNSView()
+        view.minWidth = minWidth
+        view.maxWidth = maxWidth
+        view.onResize = onResize
+        view.currentWidth = currentWidth
+        return view
     }
+
     func updateNSView(_ nsView: NSView, context: Context) {
         guard let resize = nsView as? ResizeNSView else { return }
         resize.minWidth = minWidth
         resize.maxWidth = maxWidth
+        resize.onResize = onResize
+        resize.currentWidth = currentWidth
     }
 }
 
 private final class ResizeNSView: NSView {
-    var minWidth: CGFloat
-    var maxWidth: CGFloat
+    var minWidth: CGFloat = 360
+    var maxWidth: CGFloat = 720
+    var onResize: ((CGFloat) -> Void)?
+    var currentWidth: (() -> CGFloat)?
+
     private var anchorX: CGFloat?
-    private var startFrame: NSRect?
-
-    init(minWidth: CGFloat, maxWidth: CGFloat) {
-        self.minWidth = minWidth
-        self.maxWidth = maxWidth
-        super.init(frame: .zero)
-    }
-
-    required init?(coder: NSCoder) { fatalError() }
+    private var startWidth: CGFloat?
 
     override func resetCursorRects() {
         addCursorRect(bounds, cursor: .resizeLeftRight)
     }
 
     override func mouseDown(with event: NSEvent) {
-        guard let window else { return }
         anchorX = NSEvent.mouseLocation.x
-        startFrame = window.frame
+        startWidth = currentWidth?() ?? window?.frame.size.width
     }
 
     override func mouseDragged(with event: NSEvent) {
-        guard let window, let anchorX, let startFrame else { return }
+        guard let anchorX, let startWidth else { return }
         let dx = NSEvent.mouseLocation.x - anchorX
-        let proposed = startFrame.width + dx
+        let proposed = startWidth + dx
         let clamped = max(minWidth, min(maxWidth, proposed))
-        var frame = window.frame
-        frame.size.width = clamped
-        // Pin the left edge — only the right edge follows the cursor.
-        frame.origin.x = startFrame.origin.x
-        window.setFrame(frame, display: true)
+        onResize?(clamped)
     }
 
     override func mouseUp(with event: NSEvent) {
         anchorX = nil
-        startFrame = nil
+        startWidth = nil
     }
 }

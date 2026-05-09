@@ -17,8 +17,7 @@ extension Attachment {
                 fileName: url.lastPathComponent
             )
         }
-        if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier),
-           let url = await loadURL(from: provider, type: .url) {
+        if let url = await loadAnyWebURL(from: provider) {
             return Attachment(kind: .url, urlString: url.absoluteString)
         }
         if provider.canLoadObject(ofClass: NSImage.self),
@@ -32,6 +31,28 @@ extension Attachment {
         if provider.canLoadObject(ofClass: NSString.self),
            let text = await loadString(from: provider) {
             return Attachment(kind: .text, text: text)
+        }
+        return nil
+    }
+
+    /// Combines the `.url` UTType path with a text-fallback path. Safari's
+    /// address-bar drag advertises `public.url` on most macOS versions,
+    /// but on some installs it only carries the URL as `public.utf8-plain-text`
+    /// — `loadObject(ofClass: URL.self)` then resumes with `nil`. Probing
+    /// the text payload and re-parsing it as a URL covers that case.
+    private static func loadAnyWebURL(from provider: NSItemProvider) async -> URL? {
+        if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier),
+           let url = await loadURL(from: provider, type: .url) {
+            return url
+        }
+        if provider.canLoadObject(ofClass: NSString.self),
+           let text = await loadString(from: provider) {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let url = URL(string: trimmed),
+               let scheme = url.scheme?.lowercased(),
+               ["http", "https", "ftp"].contains(scheme) {
+                return url
+            }
         }
         return nil
     }

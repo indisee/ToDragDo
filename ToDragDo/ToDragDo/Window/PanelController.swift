@@ -15,22 +15,12 @@ final class PanelController {
     private var keyMonitor: Any?
 
     init(repository: Repository, settings: AppSettings) {
-        let host = NSHostingController(
-            rootView: AnyView(
-                PanelView()
-                    .environment(repository)
-                    .environment(settings)
-            )
-        )
-        host.sizingOptions = [.preferredContentSize]
-
         let panel = FloatingPanel(
             contentRect: NSRect(x: 0, y: 0, width: 420, height: 200),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
         )
-        panel.contentViewController = host
         panel.level = .floating
         panel.collectionBehavior = [
             .canJoinAllSpaces,
@@ -46,7 +36,7 @@ final class PanelController {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
-        panel.sharingType = .none
+        panel.sharingType = settings.hideFromScreenSharing ? .none : .readOnly
         panel.contentView?.wantsLayer = true
         panel.contentView?.layer?.cornerRadius = 14
         panel.contentView?.layer?.masksToBounds = true
@@ -55,6 +45,19 @@ final class PanelController {
         self.panel = panel
         self.settingsWindow = SettingsWindow(settings: settings)
         self.isVisible = false
+
+        // Wire the SwiftUI host after `self` is fully initialized so the
+        // panel tree can read `PanelController` from the environment.
+        let host = NSHostingController(
+            rootView: AnyView(
+                PanelView()
+                    .environment(repository)
+                    .environment(settings)
+                    .environment(self)
+            )
+        )
+        host.sizingOptions = [.preferredContentSize]
+        panel.contentViewController = host
 
         // App.init runs before `applicationDidFinishLaunching`. Calling
         // show synchronously here is unreliable — the run loop hasn't

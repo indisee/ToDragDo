@@ -2,18 +2,30 @@ import SwiftUI
 import ToDragDoCore
 
 /// A compact horizontal strip of icons summarizing an item's attachments.
-/// One small SF Symbol per attachment, color-keyed to its kind.
+/// One small SF Symbol per attachment, color-keyed to its kind. Beyond
+/// `maxIcons`, the remainder collapses into a "N+" label so a row with
+/// many attachments doesn't widen unboundedly.
 struct AttachmentIconStrip: View {
     let attachments: [Attachment]
 
+    private static let maxIcons = 2
+
     var body: some View {
         if !attachments.isEmpty {
+            let visible = attachments.prefix(Self.maxIcons)
+            let overflow = attachments.count - visible.count
             HStack(spacing: 4) {
-                ForEach(Array(attachments.enumerated()), id: \.offset) { _, attachment in
+                ForEach(Array(visible.enumerated()), id: \.offset) { _, attachment in
                     Image(systemName: symbol(for: attachment.kind))
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(color(for: attachment.kind))
                         .frame(width: 14, height: 14)
+                }
+                if overflow > 0 {
+                    Text("\(overflow)+")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(height: 14)
                 }
             }
             .accessibilityElement(children: .ignore)
