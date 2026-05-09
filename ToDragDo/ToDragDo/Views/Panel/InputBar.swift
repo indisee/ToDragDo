@@ -38,9 +38,13 @@ struct InputBar: View {
                 }
             }
 
-            if !isDropping, let attachment = state.pendingAttachment {
-                AttachmentChip(attachment: attachment) {
-                    state.pendingAttachment = nil
+            if !state.pendingAttachments.isEmpty {
+                FlowLayout(spacing: 6) {
+                    ForEach(Array(state.pendingAttachments.enumerated()), id: \.offset) { index, attachment in
+                        AttachmentChip(attachment: attachment) {
+                            state.pendingAttachments.remove(at: index)
+                        }
+                    }
                 }
             }
         }
@@ -59,30 +63,31 @@ struct InputBar: View {
             .input,
             label: "Drop to add",
             icon: "plus",
-            types: DropTargetTypes.withText
-        ) { attachment in
-            panelState.pendingAttachment = attachment
-        }
+            types: DropTargetTypes.withText,
+            onAttachment: { attachment in
+                panelState.pendingAttachments.append(attachment)
+            }
+        )
     }
 
     private var leadingIcon: String {
-        panelState.pendingAttachment == nil ? "plus" : "paperclip"
+        panelState.pendingAttachments.isEmpty ? "plus" : "paperclip"
     }
 
     private func submit() async {
         let note = panelState.inputDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-        let attachment = panelState.pendingAttachment
-        guard !note.isEmpty || attachment != nil else { return }
+        let attachments = panelState.pendingAttachments
+        guard !note.isEmpty || !attachments.isEmpty else { return }
         do {
-            let payload = ItemPayload(note: note, attachment: attachment)
-            let typeIdentifier = attachment?.typeIdentifier ?? "text/plain"
+            let payload = ItemPayload(note: note, attachments: attachments)
+            let typeIdentifier = attachments.first?.typeIdentifier ?? "text/plain"
             try await repository.add(
                 folder: panelState.selectedFolder,
                 typeIdentifier: typeIdentifier,
                 payload: try payload.encoded()
             )
             panelState.inputDraft = ""
-            panelState.pendingAttachment = nil
+            panelState.pendingAttachments = []
         } catch {
             print("InputBar submit failed: \(error)")
         }

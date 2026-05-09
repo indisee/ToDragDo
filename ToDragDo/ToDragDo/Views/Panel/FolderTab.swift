@@ -1,10 +1,11 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import ToDragDoCore
 
 /// A single folder tab in the FolderTabBar.
 ///
-/// Tapping switches to the folder; dropping an item drag onto it moves
-/// the item to that folder.
+/// Tapping switches to the folder; dropping an item-drag URL onto it
+/// moves the item to that folder.
 struct FolderTab: View {
     @Environment(\.theme) private var theme
     @Environment(Repository.self) private var repository
@@ -20,13 +21,16 @@ struct FolderTab: View {
             HStack(spacing: 6) {
                 Text(folder.displayName)
                     .font(.system(size: theme.captionSize, weight: .semibold))
-                if let count, isSelected {
+                if let count {
                     Text("\(count)")
                         .font(.system(size: theme.captionSize - 1, weight: .bold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(isSelected ? .white : .secondary)
                         .padding(.horizontal, 5)
                         .padding(.vertical, 1)
-                        .background(theme.accent, in: Capsule())
+                        .background(
+                            isSelected ? theme.accent : theme.accent.opacity(0.12),
+                            in: Capsule()
+                        )
                 }
             }
             .padding(.horizontal, 8)
@@ -36,9 +40,9 @@ struct FolderTab: View {
             .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .dropDestination(for: String.self) { droppedIds, _ in
-            handleDrop(droppedIds)
-        } isTargeted: { isDropTargeted = $0 }
+        .onDrop(of: [.url], isTargeted: $isDropTargeted) { providers in
+            handleDrop(providers)
+        }
     }
 
     private var background: Color {
@@ -47,11 +51,10 @@ struct FolderTab: View {
         return .clear
     }
 
-    private func handleDrop(_ droppedIds: [String]) -> Bool {
-        guard let raw = droppedIds.first, let id = UUID(uuidString: raw) else {
-            return false
-        }
-        Task {
+    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first else { return false }
+        Task { @MainActor in
+            guard let id = await ItemDragURL.itemID(from: provider) else { return }
             try? await repository.move(id: id, to: folder)
         }
         return true

@@ -2,106 +2,192 @@ import SwiftUI
 import ToDragDoCore
 import UniformTypeIdentifiers
 
-/// A single (collapsed) item row.
+/// A single (closed or open) item row.
 ///
-/// - Hover reveals folder-specific action icons.
-/// - Quick click toggles fold/unfold.
-/// - Press + drag the row body to reorder; dropping on a row places the
-///   dragged item immediately above it.
+/// Closed:
+/// - One line: badge + truncated text + attachment icon strip.
+/// - The whole row is draggable (URL with our private scheme).
+/// - Tap opens the row.
+/// - Hover reveals a folder-actions menu that overlays the right edge,
+///   sitting on top of the row's content with its own background.
+///
+/// Open:
+/// - Multi-line text (selectable / copyable) + clickable attachment
+///   previews.
+/// - Drag is disabled so text selection works.
+/// - A floating menu (folder actions + X close) sits above the row,
+///   outside the row's bounds.
+///
+/// Drop (always):
+/// - Dropping a row's drag URL reorders this item.
+/// - Dropping anything else attaches it to this item.
+/// - While a drag hovers this row, the row's content is hidden so the
+///   `DropOverlay` reads cleanly (mirrors the input bar).
 struct ItemRow: View {
     @Environment(\.theme) private var theme
     @Environment(Repository.self) private var repository
     @Environment(PanelState.self) private var panelState
+    @Environment(DragSession.self) private var session
 
     let item: Item
 
-    @State private var isHovering = false
-    @State private var isDropTargeted = false
+    @State private var isRowHover = false
+    @State private var isMenuHover = false
 
     private var actions: [RowAction] { RowAction.actions(for: item.folder) }
-
     private var isExpanded: Bool { panelState.expandedItemId == item.id }
-
     private var payload: ItemPayload { ItemPayload.decode(item.payload) }
+    private var isReceivingDrop: Bool { session.target == .item(item.id) }
+
+    /// Combined hover state: true while the cursor is over the row OR
+    /// over the floating menu. Without this, the menu (which lives in
+    /// an overlay) flickers because mousing onto the menu's buttons
+    /// causes `.onHover` on the row to fire false.
+    private var isHovered: Bool { isRowHover || isMenuHover }
 
     var body: some View {
-        VStack(spacing: 0) {
-            collapsedContent
-            if isExpanded {
-                expandedContent
-                    .transition(.opacity)
+        rowCore
+            .draggableWhenClosed(!isExpanded, payload: ItemDragURL.url(for: item.id)) {
+                dragPreview
+            }
+            .tapWhenClosed(!isExpanded) { open() }
+    }
+
+    // MARK: - Core (visual + drop targets)
+
+    private var rowCore: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if isReceivingDrop {
+                Color.clear.frame(minHeight: theme.rowHeight)
+            } else {
+                mainRow
+                if isExpanded, !payload.attachments.isEmpty {
+                    attachmentPreviews
+                }
             }
         }
         .background(rowBackground)
-        .overlay(alignment: .top) { dropIndicator }
         .contentShape(Rectangle())
-        .onHover { isHovering = $0 }
-        .onTapGesture {
-            withAnimation(.easeInOut(duration: 0.18)) {
-                panelState.toggleExpanded(item.id)
-            }
-        }
-        .draggable(item.id.uuidString) {
-            dragPreview
-        }
-        .dropDestination(for: String.self) { droppedIds, _ in
-            handleReorderDrop(droppedIds)
-        } isTargeted: { isDropTargeted = $0 }
+        .onHover { isRowHover = $0 }
+        .overlay(alignment: .topTrailing) { actionsOverlay }
         .dropTarget(
             .item(item.id),
-            label: "Attach to item",
-            icon: "paperclip"
-        ) { attachment in
-            Task {
-                try? await repository.addAttachment(to: item.id, attachment)
+            label: "Drop on item",
+            icon: "paperclip",
+            onAttachment: { attachment in
+                Task {
+                    try? await repository.addAttachment(to: item.id, attachment)
+                }
+            },
+            onItemReorder: { droppedId in
+                guard droppedId != item.id else { return }
+                Task {
+                    try? await repository.reorder(id: droppedId, before: item.id)
+                }
             }
-        }
+        )
+        .zIndex(isExpanded || isHovered ? 1 : 0)
     }
 
-    // MARK: - Collapsed row
+    // MARK: - Main row (badge + text + icons)
 
-    private var collapsedContent: some View {
-        HStack(spacing: 8) {
+    private var mainRow: some View {
+        HStack(alignment: isExpanded ? .top : .center, spacing: 8) {
             TypeBadge(typeIdentifier: item.typeIdentifier)
+                .frame(width: 24, height: theme.rowHeight)
+            noteText
+            AttachmentIconStrip(attachments: payload.attachments)
+                .frame(height: theme.rowHeight)
+        }
+        .padding(.horizontal, 10)
+        .frame(minHeight: theme.rowHeight)
+    }
+
+    /// Note text. Single line + truncation when closed; full multi-line
+    /// + selection when open. `.fixedSize(vertical:)` keeps the frame
+    /// from collapsing during the expand/close transition.
+    @ViewBuilder
+    private var noteText: some View {
+        if isExpanded {
+            Text(displayText)
+                .font(.system(size: theme.bodySize))
+                .textSelection(.enabled)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, minHeight: theme.rowHeight, alignment: .topLeading)
+                .padding(.vertical, 6)
+                .layoutPriority(1)
+        } else {
             Text(displayText)
                 .font(.system(size: theme.bodySize))
                 .lineLimit(1)
                 .truncationMode(.tail)
-            AttachmentIconStrip(attachments: extraAttachments)
-            Spacer(minLength: 8)
-            if isHovering {
-                HoverActions(actions: actions) { action in
-                    dispatch(action)
-                }
-            }
+                .frame(maxWidth: .infinity, minHeight: theme.rowHeight, alignment: .leading)
+                .layoutPriority(1)
         }
-        .padding(.horizontal, 10)
-        .frame(height: theme.rowHeight)
     }
+
+    // MARK: - Hover / close menu overlay
+
+    @ViewBuilder
+    private var actionsOverlay: some View {
+        if isReceivingDrop {
+            EmptyView()
+        } else if isExpanded {
+            floatingActionPanel
+                .padding(.trailing, 8)
+                .offset(y: -16)
+        } else if isHovered {
+            collapsedHoverActions
+                .padding(.trailing, 8)
+                .padding(.top, max(0, (theme.rowHeight - hoverPanelHeight) / 2))
+        }
+    }
+
+    /// Open: hover actions + always-visible X close. Floats outside the
+    /// row's bounds, above the top edge.
+    private var floatingActionPanel: some View {
+        HStack(spacing: 6) {
+            HoverActions(actions: actions) { dispatch($0) }
+            Divider().frame(height: 14)
+            Button(action: close) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: theme.bodySize, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Close")
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(.thickMaterial, in: Capsule())
+        .overlay(Capsule().strokeBorder(.separator, lineWidth: 0.5))
+        .onHover { isMenuHover = $0 }
+    }
+
+    /// Closed + hover: actions overlay the right edge with their own
+    /// background so they sit on top of the row content rather than
+    /// reflowing it.
+    private var collapsedHoverActions: some View {
+        HoverActions(actions: actions) { dispatch($0) }
+            .padding(.horizontal, 6)
+            .padding(.vertical, 3)
+            .background(.thickMaterial, in: Capsule())
+            .overlay(Capsule().strokeBorder(.separator, lineWidth: 0.5))
+            .onHover { isMenuHover = $0 }
+    }
+
+    private var hoverPanelHeight: CGFloat { theme.bodySize + 14 }
 
     // MARK: - Expanded body
 
-    private var expandedContent: some View {
+    private var attachmentPreviews: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if !payload.note.isEmpty {
-                Text(payload.note)
-                    .font(.system(size: theme.bodySize))
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .foregroundStyle(.secondary)
-            }
             ForEach(Array(payload.attachments.enumerated()), id: \.offset) { _, attachment in
                 AttachmentPreview(attachment: attachment)
             }
         }
         .padding(.horizontal, 28)
         .padding(.bottom, 8)
-    }
-
-    /// Attachments to render as mini icons next to the row text.
-    /// The leading `TypeBadge` already shows the first attachment's kind,
-    /// so the strip starts from the second one.
-    private var extraAttachments: [Attachment] {
-        Array(payload.attachments.dropFirst())
     }
 
     // MARK: - Drag preview
@@ -122,19 +208,10 @@ struct ItemRow: View {
 
     @ViewBuilder
     private var rowBackground: some View {
-        if isHovering {
+        if isHovered {
             theme.accent.opacity(0.06)
         } else {
             Color.clear
-        }
-    }
-
-    @ViewBuilder
-    private var dropIndicator: some View {
-        if isDropTargeted {
-            Rectangle()
-                .fill(theme.accent)
-                .frame(height: 2)
         }
     }
 
@@ -148,15 +225,16 @@ struct ItemRow: View {
         return "—"
     }
 
-    private func handleReorderDrop(_ droppedIds: [String]) -> Bool {
-        guard let raw = droppedIds.first, let droppedId = UUID(uuidString: raw) else {
-            return false
+    private func open() {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            panelState.openItem(item.id)
         }
-        guard droppedId != item.id else { return false }
-        Task {
-            try? await repository.reorder(id: droppedId, before: item.id)
+    }
+
+    private func close() {
+        withAnimation(.easeInOut(duration: 0.18)) {
+            panelState.closeItem()
         }
-        return true
     }
 
     private func dispatch(_ action: RowAction) {
@@ -172,6 +250,35 @@ struct ItemRow: View {
             } catch {
                 print("ItemRow action failed: \(error)")
             }
+        }
+    }
+}
+
+// MARK: - Conditional modifiers
+
+private extension View {
+    /// Applies `.draggable` only when `enabled` is true. Used to disable
+    /// drag while the row is open so text selection works.
+    @ViewBuilder
+    func draggableWhenClosed<P: Transferable, V: View>(
+        _ enabled: Bool,
+        payload: P,
+        @ViewBuilder preview: () -> V
+    ) -> some View {
+        if enabled {
+            self.draggable(payload, preview: preview)
+        } else {
+            self
+        }
+    }
+
+    /// Applies `.onTapGesture` only when `enabled` is true.
+    @ViewBuilder
+    func tapWhenClosed(_ enabled: Bool, perform: @escaping () -> Void) -> some View {
+        if enabled {
+            self.onTapGesture(perform: perform)
+        } else {
+            self
         }
     }
 }

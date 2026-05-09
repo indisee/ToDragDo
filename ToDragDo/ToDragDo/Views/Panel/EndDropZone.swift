@@ -1,4 +1,5 @@
 import SwiftUI
+import UniformTypeIdentifiers
 import ToDragDoCore
 
 /// Invisible drop target placed after the last row in `ItemList`.
@@ -21,16 +22,15 @@ struct EndDropZone: View {
                         .frame(height: 2)
                 }
             }
-            .dropDestination(for: String.self) { droppedIds, _ in
-                handleDrop(droppedIds)
-            } isTargeted: { isTargeted = $0 }
+            .onDrop(of: [.url], isTargeted: $isTargeted) { providers in
+                handleDrop(providers)
+            }
     }
 
-    private func handleDrop(_ droppedIds: [String]) -> Bool {
-        guard let raw = droppedIds.first, let id = UUID(uuidString: raw) else {
-            return false
-        }
-        Task {
+    private func handleDrop(_ providers: [NSItemProvider]) -> Bool {
+        guard let provider = providers.first else { return false }
+        Task { @MainActor in
+            guard let id = await ItemDragURL.itemID(from: provider) else { return }
             try? await repository.reorder(id: id, before: nil)
         }
         return true

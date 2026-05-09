@@ -10,7 +10,7 @@ extension Attachment {
     /// image → plain text. Returns `nil` if nothing matches.
     static func from(provider: NSItemProvider) async -> Attachment? {
         if provider.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier),
-           let url = await loadURL(from: provider) {
+           let url = await loadURL(from: provider, type: .fileURL) {
             return Attachment(
                 kind: .fileURL,
                 urlString: url.absoluteString,
@@ -18,7 +18,7 @@ extension Attachment {
             )
         }
         if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier),
-           let url = await loadURL(from: provider) {
+           let url = await loadURL(from: provider, type: .url) {
             return Attachment(kind: .url, urlString: url.absoluteString)
         }
         if provider.canLoadObject(ofClass: NSImage.self),
@@ -36,9 +36,27 @@ extension Attachment {
         return nil
     }
 
-    private static func loadURL(from provider: NSItemProvider) async -> URL? {
-        await withCheckedContinuation { cont in
+    /// Two-step URL extraction. `loadObject(ofClass: URL.self)` is the
+    /// happy path, but some browsers vend a provider where it resumes
+    /// with `nil` even though the URL UTType is conformed to. In that
+    /// case fall back to the raw data representation, which is how
+    /// `kPasteboardTypeFileURLPromise`-style payloads arrive.
+    private static func loadURL(from provider: NSItemProvider, type: UTType) async -> URL? {
+        if let url: URL = await withCheckedContinuation({ cont in
             _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                cont.resume(returning: url)
+            }
+        }) {
+            return url
+        }
+        return await withCheckedContinuation { cont in
+            provider.loadDataRepresentation(forTypeIdentifier: type.identifier) { data, _ in
+                guard let data,
+                      let url = URL(dataRepresentation: data, relativeTo: nil)
+                else {
+                    cont.resume(returning: nil)
+                    return
+                }
                 cont.resume(returning: url)
             }
         }
