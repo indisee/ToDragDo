@@ -22,12 +22,15 @@ struct AttachmentIconStrip: View {
                         .frame(width: 14, height: 14)
                 }
                 if overflow > 0 {
-                    Text("\(overflow)+")
+                    Text("+\(overflow)")
                         .font(.system(size: 10, weight: .semibold))
                         .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                         .frame(height: 14)
                 }
             }
+            .fixedSize(horizontal: true, vertical: false)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("\(attachments.count) attachment\(attachments.count == 1 ? "" : "s")")
         }

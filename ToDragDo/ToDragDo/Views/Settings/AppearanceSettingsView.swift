@@ -13,8 +13,6 @@ struct AppearanceSettingsView: View {
                 }
             }
             .pickerStyle(.segmented)
-
-            Toggle("Hide during screen sharing", isOn: $settings.hideFromScreenSharing)
         }
         .padding(20)
         .frame(width: 420)

@@ -12,6 +12,7 @@ struct FolderTab: View {
     let folder: Folder
     let isSelected: Bool
     let count: Int?
+    let isCompact: Bool
     let action: () -> Void
 
     @State private var isDropTargeted = false
@@ -19,25 +20,26 @@ struct FolderTab: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 6) {
-                Text(folder.displayName)
-                    .font(.system(size: theme.captionSize, weight: .semibold))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .layoutPriority(isSelected ? 1 : 0)
-                if let count {
-                    Text("\(count)")
-                        .font(.system(size: theme.captionSize - 1, weight: .bold))
-                        .foregroundStyle(isSelected ? .white : .secondary)
+                if !isCompact {
+                    Text(folder.displayName)
+                        .font(.system(size: theme.captionSize, weight: .semibold))
                         .lineLimit(1)
-                        .fixedSize()
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(
-                            isSelected ? theme.accent : theme.accent.opacity(0.12),
-                            in: Capsule()
-                        )
+                        .truncationMode(.tail)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .layoutPriority(isSelected ? 1 : 0)
                 }
+                Text("\(count ?? 0)")
+                    .font(.system(size: theme.captionSize - 1, weight: .bold))
+                    .foregroundStyle(isSelected ? .white : .secondary)
+                    .lineLimit(1)
+                    .fixedSize()
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(
+                        isSelected ? theme.accent : theme.accent.opacity(0.12),
+                        in: Capsule()
+                    )
+                    .accessibilityLabel(folder.displayName)
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)

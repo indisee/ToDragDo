@@ -7,6 +7,8 @@ struct ToDragDoApp: App {
     @State private var repository: Repository
     @State private var settings: AppSettings
     @State private var panelController: PanelController
+    @State private var dayRollover: DayRollover
+    @State private var menuBar: MenuBarStatusItem
 
     init() {
         let storage: any ItemStorage
@@ -21,19 +23,27 @@ struct ToDragDoApp: App {
             repository: repository,
             settings: settings
         )
+        let dayRollover = DayRollover(repository: repository)
+        dayRollover.start()
+        let menuBar = MenuBarStatusItem(panelController: panelController)
         _repository = State(initialValue: repository)
         _settings = State(initialValue: settings)
         _panelController = State(initialValue: panelController)
+        _dayRollover = State(initialValue: dayRollover)
+        _menuBar = State(initialValue: menuBar)
     }
 
     var body: some Scene {
-        // No `Settings` scene — SwiftUI was auto-opening it at launch
-        // even with `LSUIElement = YES` and an `AppDelegate` close
-        // loop. Settings is now a custom NSWindow shown on demand from
-        // `MenuBarMenu`.
-        MenuBarExtra("ToDragDo", systemImage: "checkmark.square.fill") {
-            MenuBarMenu()
-                .environment(panelController)
+        // The actual menu bar icon is the `NSStatusItem` owned by
+        // `MenuBarStatusItem`. SwiftUI requires at least one Scene; this
+        // hidden `MenuBarExtra` (`isInserted: false`) satisfies that
+        // without registering a duplicate icon.
+        MenuBarExtra(
+            "ToDragDo",
+            systemImage: "checklist",
+            isInserted: .constant(false)
+        ) {
+            EmptyView()
         }
     }
 }

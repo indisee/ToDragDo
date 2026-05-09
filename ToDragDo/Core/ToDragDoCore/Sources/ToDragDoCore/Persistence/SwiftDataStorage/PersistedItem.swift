@@ -13,6 +13,7 @@ final class PersistedItem {
     var updatedAt: Date = Date.distantPast
     var deletedAt: Date?
     var lastEditedBy: String = ""
+    var dueDate: Date?
 
     init(from dto: Item) {
         self.id = dto.id
@@ -24,6 +25,7 @@ final class PersistedItem {
         self.updatedAt = dto.updatedAt
         self.deletedAt = dto.deletedAt
         self.lastEditedBy = dto.lastEditedBy
+        self.dueDate = dto.dueDate
     }
 
     func apply(_ dto: Item) {
@@ -34,6 +36,7 @@ final class PersistedItem {
         self.updatedAt = dto.updatedAt
         self.deletedAt = dto.deletedAt
         self.lastEditedBy = dto.lastEditedBy
+        self.dueDate = dto.dueDate
     }
 
     func toDTO() -> Item {
@@ -46,7 +49,8 @@ final class PersistedItem {
             createdAt: createdAt,
             updatedAt: updatedAt,
             deletedAt: deletedAt,
-            lastEditedBy: lastEditedBy
+            lastEditedBy: lastEditedBy,
+            dueDate: dueDate
         )
     }
 }

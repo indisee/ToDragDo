@@ -59,10 +59,16 @@ struct ItemRow: View {
 
     private var rowCore: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if isReceivingDrop {
-                Color.clear.frame(minHeight: theme.rowHeight)
-            } else if isExpanded {
+            if isExpanded {
+                // Keep the expanded layout rendered even while a drag is
+                // hovering. Swapping in a placeholder during drag would
+                // collapse the row's height, the cursor would fall off,
+                // exit fires, the row re-expands — and the drop target
+                // flickers in a loop. The DropOverlay still renders on
+                // top via the .overlay below.
                 expandedBody
+            } else if isReceivingDrop {
+                Color.clear.frame(minHeight: theme.rowHeight)
             } else {
                 mainRow
             }
@@ -95,7 +101,7 @@ struct ItemRow: View {
 
     private var mainRow: some View {
         HStack(alignment: isExpanded ? .top : .center, spacing: 8) {
-            TypeBadge(typeIdentifier: item.typeIdentifier)
+            TypeBadge(typeIdentifier: item.typeIdentifier, dueDate: item.dueDate)
                 .frame(width: 24, height: theme.rowHeight)
             noteText
             AttachmentIconStrip(attachments: payload.attachments)
@@ -145,11 +151,13 @@ struct ItemRow: View {
         }
     }
 
-    /// Open: hover actions + always-visible X close. Floats outside the
-    /// row's bounds, above the top edge.
+    /// Open: hover actions + date assign + always-visible X close.
+    /// Floats outside the row's bounds, above the top edge.
     private var floatingActionPanel: some View {
         HStack(spacing: 6) {
             HoverActions(actions: actions) { dispatch($0) }
+            Divider().frame(height: 14)
+            DateAssignButton(item: item)
             Divider().frame(height: 14)
             Button(action: close) {
                 Image(systemName: "xmark.circle.fill")
