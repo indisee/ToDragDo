@@ -46,6 +46,7 @@ final class PanelController {
         panel.isOpaque = false
         panel.backgroundColor = .clear
         panel.hasShadow = true
+        panel.sharingType = .none
         panel.contentView?.wantsLayer = true
         panel.contentView?.layer?.cornerRadius = 14
         panel.contentView?.layer?.masksToBounds = true

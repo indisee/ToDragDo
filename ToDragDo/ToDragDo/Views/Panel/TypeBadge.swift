@@ -19,6 +19,7 @@ struct TypeBadge: View {
         case "jira":     "+"
         case "url":      "0"
         case "image":    "■"
+        case "file":     "▤"
         default:         "="
         }
     }
@@ -28,6 +29,7 @@ struct TypeBadge: View {
         case "jira":     theme.accent
         case "url":      .blue
         case "image":    .green
+        case "file":     .orange
         default:         .secondary
         }
     }

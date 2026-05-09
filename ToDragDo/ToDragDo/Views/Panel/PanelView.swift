@@ -14,6 +14,7 @@ struct PanelView: View {
     @Environment(Repository.self) private var repository
 
     @State private var panelState = PanelState()
+    @State private var dragSession = DragSession()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -35,6 +36,7 @@ struct PanelView: View {
                 .fill(.background)
         )
         .environment(panelState)
+        .environment(dragSession)
         .preferredColorScheme(settings.appearance.colorScheme)
         .onAppear { applyAppearance(settings.appearance) }
         .onChange(of: settings.appearance) { _, new in

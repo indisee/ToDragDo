@@ -62,6 +62,23 @@ public final class Repository {
         try await reload()
     }
 
+    /// Append `attachment` to an existing item's payload. The item's
+    /// `typeIdentifier` is left unchanged — the primary content type is
+    /// the one the item was created with.
+    public func addAttachment(to id: UUID, _ attachment: Attachment) async throws {
+        guard var item = try await storage.item(id: id) else {
+            throw StorageError.notFound(id)
+        }
+        var payload = ItemPayload.decode(item.payload)
+        payload.attachments.append(attachment)
+        item.payload = try payload.encoded()
+        item.updatedAt = .now
+        item.lastEditedBy = deviceId
+        let change = makeChange(op: .update, item: item)
+        try await storage.upsert(item, change: change)
+        try await reload()
+    }
+
     public func move(id: UUID, to destination: Folder) async throws {
         guard var item = try await storage.item(id: id) else {
             throw StorageError.notFound(id)

@@ -22,6 +22,8 @@ struct ItemRow: View {
 
     private var isExpanded: Bool { panelState.expandedItemId == item.id }
 
+    private var payload: ItemPayload { ItemPayload.decode(item.payload) }
+
     var body: some View {
         VStack(spacing: 0) {
             collapsedContent
@@ -43,8 +45,17 @@ struct ItemRow: View {
             dragPreview
         }
         .dropDestination(for: String.self) { droppedIds, _ in
-            handleDrop(droppedIds)
+            handleReorderDrop(droppedIds)
         } isTargeted: { isDropTargeted = $0 }
+        .dropTarget(
+            .item(item.id),
+            label: "Attach to item",
+            icon: "paperclip"
+        ) { attachment in
+            Task {
+                try? await repository.addAttachment(to: item.id, attachment)
+            }
+        }
     }
 
     // MARK: - Collapsed row
@@ -56,6 +67,7 @@ struct ItemRow: View {
                 .font(.system(size: theme.bodySize))
                 .lineLimit(1)
                 .truncationMode(.tail)
+            AttachmentIconStrip(attachments: extraAttachments)
             Spacer(minLength: 8)
             if isHovering {
                 HoverActions(actions: actions) { action in
@@ -70,12 +82,26 @@ struct ItemRow: View {
     // MARK: - Expanded body
 
     private var expandedContent: some View {
-        Text(displayText)
-            .font(.system(size: theme.bodySize))
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 28)
-            .padding(.bottom, 8)
-            .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 8) {
+            if !payload.note.isEmpty {
+                Text(payload.note)
+                    .font(.system(size: theme.bodySize))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .foregroundStyle(.secondary)
+            }
+            ForEach(Array(payload.attachments.enumerated()), id: \.offset) { _, attachment in
+                AttachmentPreview(attachment: attachment)
+            }
+        }
+        .padding(.horizontal, 28)
+        .padding(.bottom, 8)
+    }
+
+    /// Attachments to render as mini icons next to the row text.
+    /// The leading `TypeBadge` already shows the first attachment's kind,
+    /// so the strip starts from the second one.
+    private var extraAttachments: [Attachment] {
+        Array(payload.attachments.dropFirst())
     }
 
     // MARK: - Drag preview
@@ -115,10 +141,14 @@ struct ItemRow: View {
     // MARK: - Helpers
 
     private var displayText: String {
-        String(data: item.payload, encoding: .utf8) ?? "—"
+        if !payload.note.isEmpty { return payload.note }
+        if let label = payload.attachments.first?.displayLabel, !label.isEmpty {
+            return label
+        }
+        return "—"
     }
 
-    private func handleDrop(_ droppedIds: [String]) -> Bool {
+    private func handleReorderDrop(_ droppedIds: [String]) -> Bool {
         guard let raw = droppedIds.first, let droppedId = UUID(uuidString: raw) else {
             return false
         }

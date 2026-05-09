@@ -27,6 +27,7 @@ final class SettingsWindow {
             window.styleMask = [.titled, .closable]
             window.isReleasedWhenClosed = false
             window.isRestorable = false
+            window.sharingType = .none
             window.center()
             self.window = window
         }
