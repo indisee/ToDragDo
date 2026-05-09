@@ -38,6 +38,7 @@ struct ItemRow: View {
     private var isExpanded: Bool { panelState.expandedItemId == item.id }
     private var payload: ItemPayload { ItemPayload.decode(item.payload) }
     private var isReceivingDrop: Bool { session.target == .item(item.id) }
+    private var isReorderTarget: Bool { session.reorderTarget == .item(item.id) }
 
     /// Combined hover state: true while the cursor is over the row OR
     /// over the floating menu. Without this, the menu (which lives in
@@ -69,6 +70,7 @@ struct ItemRow: View {
         .background(rowBackground)
         .contentShape(Rectangle())
         .onHover { isRowHover = $0 }
+        .overlay(alignment: .top) { reorderIndicator }
         .overlay(alignment: .topTrailing) { actionsOverlay }
         .dropTarget(
             .item(item.id),
@@ -205,6 +207,17 @@ struct ItemRow: View {
     }
 
     // MARK: - Visual feedback
+
+    /// Thin accent line at the top of the row while an in-app drag
+    /// is hovering — indicates "the dropped item lands above this row".
+    @ViewBuilder
+    private var reorderIndicator: some View {
+        if isReorderTarget {
+            Rectangle()
+                .fill(theme.accent)
+                .frame(height: 2)
+        }
+    }
 
     @ViewBuilder
     private var rowBackground: some View {

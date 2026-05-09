@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 import ToDragDoCore
@@ -52,11 +53,31 @@ private struct DropTargetModifier: ViewModifier {
             }
             .onChange(of: isTargeted) { _, new in
                 if new {
-                    session.enter(id)
+                    // Internal item-row drags use a separate channel
+                    // (`enterReorder`) so receivers render a line
+                    // indicator instead of the "Drop on item" overlay
+                    // and don't hide their content.
+                    if isInternalReorderDrag() {
+                        session.enterReorder(id)
+                    } else {
+                        session.enter(id)
+                    }
                 } else {
                     session.exit(id)
                 }
             }
+    }
+
+    /// Inspects the active drag pasteboard for our private URL scheme.
+    /// `NSPasteboard(name: .drag)` is the system drag-drop pasteboard;
+    /// SwiftUI's `.draggable(URL)` writes through it, so we can read
+    /// the dragged URLs synchronously during hover.
+    private func isInternalReorderDrag() -> Bool {
+        let pb = NSPasteboard(name: .drag)
+        guard let urls = pb.readObjects(forClasses: [NSURL.self], options: nil) as? [URL] else {
+            return false
+        }
+        return urls.contains { ItemDragURL.itemID(from: $0) != nil }
     }
 
     private func handle(_ providers: [NSItemProvider]) -> Bool {
