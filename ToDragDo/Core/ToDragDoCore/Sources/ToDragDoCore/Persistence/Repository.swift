@@ -36,10 +36,13 @@ public final class Repository {
         typeIdentifier: String,
         payload: Data
     ) async throws -> Item {
-        let nextKey = (items[folder]?.last?.orderKey ?? 0) + 1
+        // New items prepend to the folder so the user sees them
+        // immediately without scrolling/paging — orderKey one tick
+        // below the current minimum.
+        let firstKey = items[folder]?.first?.orderKey ?? 1
         let item = Item(
             folder: folder,
-            orderKey: nextKey,
+            orderKey: firstKey - 1,
             typeIdentifier: typeIdentifier,
             payload: payload,
             lastEditedBy: deviceId

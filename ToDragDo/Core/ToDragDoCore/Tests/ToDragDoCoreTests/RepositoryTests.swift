@@ -128,46 +128,60 @@ struct RepositoryTests {
         }
     }
 
-    @Test("reorder before target inserts between target's predecessor and target")
-    func reorderBeforeTargetInsertsAbove() async throws {
+    @Test("add prepends new items to the folder")
+    func addPrepends() async throws {
         let (repo, _) = makeSUT()
         let a = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data("a".utf8))
         let b = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data("b".utf8))
         let c = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data("c".utf8))
 
-        // Move c to sit before b. New order: a, c, b.
-        try await repo.reorder(id: c.id, before: b.id)
+        let order = try #require(repo.items[.today]).map(\.id)
+        #expect(order == [c.id, b.id, a.id])
+    }
+
+    @Test("reorder before target inserts between target's predecessor and target")
+    func reorderBeforeTargetInsertsAbove() async throws {
+        let (repo, _) = makeSUT()
+        // Add prepends, so the resulting order is c, b, a.
+        let a = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data("a".utf8))
+        let b = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data("b".utf8))
+        let c = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data("c".utf8))
+
+        // Move a to sit before b. New order: c, a, b.
+        try await repo.reorder(id: a.id, before: b.id)
 
         let order = try #require(repo.items[.today]).map(\.id)
-        #expect(order == [a.id, c.id, b.id])
+        #expect(order == [c.id, a.id, b.id])
     }
 
     @Test("reorder before nil appends to the end")
     func reorderBeforeNilAppends() async throws {
         let (repo, _) = makeSUT()
+        // Add prepends, so the resulting order is c, b, a.
         let a = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data())
         let b = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data())
         let c = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data())
 
-        // Move a to the end. New order: b, c, a.
-        try await repo.reorder(id: a.id, before: nil)
+        // Move c to the end. New order: b, a, c.
+        try await repo.reorder(id: c.id, before: nil)
 
         let order = try #require(repo.items[.today]).map(\.id)
-        #expect(order == [b.id, c.id, a.id])
+        #expect(order == [b.id, a.id, c.id])
     }
 
     @Test("reorder before the first item lands the dragged item at the top")
     func reorderBeforeFirstItem() async throws {
         let (repo, _) = makeSUT()
+        // Add prepends, so the resulting order is c, b, a.
         let a = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data())
         let b = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data())
         let c = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data())
 
-        // Move c above a. New order: c, a, b.
-        try await repo.reorder(id: c.id, before: a.id)
+        // Move a above c (the current top). New order: a, c, b.
+        try await repo.reorder(id: a.id, before: c.id)
 
         let order = try #require(repo.items[.today]).map(\.id)
-        #expect(order == [c.id, a.id, b.id])
+        #expect(order == [a.id, c.id, b.id])
     }
 
     @Test("reorder onto self is a no-op")
@@ -178,8 +192,9 @@ struct RepositoryTests {
 
         try await repo.reorder(id: a.id, before: a.id)
 
+        // Add prepends, so b lands above a.
         let order = try #require(repo.items[.today]).map(\.id)
-        #expect(order == [a.id, b.id])
+        #expect(order == [b.id, a.id])
     }
 
     @Test("ChangeRecord snapshot decodes back to the saved Item")
