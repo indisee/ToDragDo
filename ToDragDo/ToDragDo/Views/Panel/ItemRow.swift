@@ -31,11 +31,14 @@ struct ItemRow: View {
     @Environment(DragSession.self) private var session
 
     let item: Item
+    var trashMode: Bool = false
 
     @State private var isRowHover = false
     @State private var isMenuHover = false
 
-    private var actions: [RowAction] { RowAction.actions(for: item.folder) }
+    private var actions: [RowAction] {
+        RowAction.actions(for: item.folder, inTrash: trashMode)
+    }
     private var isExpanded: Bool { panelState.expandedItemId == item.id }
     private var payload: ItemPayload { ItemPayload.decode(item.payload) }
     private var isReceivingDrop: Bool { session.target == .item(item.id) }
@@ -75,7 +78,7 @@ struct ItemRow: View {
         }
         .background(rowBackground)
         .contentShape(Rectangle())
-        .onHover { isRowHover = $0 }
+        .onHoverStable { isRowHover = $0 }
         .overlay(alignment: .top) { reorderIndicator }
         .overlay(alignment: .topTrailing) { actionsOverlay }
         .dropTarget(
@@ -106,9 +109,23 @@ struct ItemRow: View {
             noteText
             AttachmentIconStrip(attachments: payload.attachments)
                 .frame(height: theme.rowHeight)
+            if item.folder == .done, let stamp = completedStamp, !isHovered {
+                Text(stamp, format: .dateTime.day(.twoDigits).month(.abbreviated))
+                    .font(.system(size: theme.captionSize, design: .rounded))
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
+                    .accessibilityLabel("Completed \(stamp.formatted(date: .abbreviated, time: .omitted))")
+            }
         }
         .padding(.horizontal, 10)
         .frame(minHeight: theme.rowHeight)
+    }
+
+    /// Fallback to `updatedAt` for items completed before `completedAt`
+    /// was introduced — close enough since Done items are rarely edited.
+    private var completedStamp: Date? {
+        item.completedAt ?? (item.folder == .done ? item.updatedAt : nil)
     }
 
     /// Note text. Single line + truncation when closed; full multi-line
@@ -291,6 +308,8 @@ struct ItemRow: View {
                 case .moveToLimbo:    try await repository.move(id: item.id, to: .libmo)
                 case .markDone:       try await repository.move(id: item.id, to: .done)
                 case .delete:         try await repository.softDelete(id: item.id)
+                case .restore:        try await repository.restore(id: item.id)
+                case .purge:          try await repository.purgeItem(id: item.id)
                 }
             } catch {
                 print("ItemRow action failed: \(error)")

@@ -19,6 +19,12 @@ actor InMemoryItemStorage: ItemStorage {
         items[id]
     }
 
+    func trashItems(since: Date) async throws -> [Item] {
+        items.values
+            .filter { ($0.deletedAt ?? .distantPast) >= since }
+            .sorted { ($0.deletedAt ?? .distantPast) > ($1.deletedAt ?? .distantPast) }
+    }
+
     func upsert(_ item: Item, change: ChangeRecord) async throws {
         items[item.id] = item
         changes[change.id] = change
@@ -34,6 +40,19 @@ actor InMemoryItemStorage: ItemStorage {
 
     func hardDelete(folder: Folder, changes incoming: [ChangeRecord]) async throws {
         let toRemove = items.values.filter { $0.folder == folder }.map(\.id)
+        for id in toRemove { items.removeValue(forKey: id) }
+        for change in incoming { changes[change.id] = change }
+    }
+
+    func hardDeleteItem(id: UUID, change: ChangeRecord) async throws {
+        items.removeValue(forKey: id)
+        changes[change.id] = change
+    }
+
+    func purgeTrash(before: Date, changes incoming: [ChangeRecord]) async throws {
+        let toRemove = items.values
+            .filter { ($0.deletedAt ?? .distantFuture) < before }
+            .map(\.id)
         for id in toRemove { items.removeValue(forKey: id) }
         for change in incoming { changes[change.id] = change }
     }

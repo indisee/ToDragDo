@@ -35,6 +35,19 @@ public final class SwiftDataStorage: ItemStorage {
         try fetchPersistedItem(id: id)?.toDTO()
     }
 
+    public func trashItems(since: Date) async throws -> [Item] {
+        // SwiftData's #Predicate macro doesn't translate force-unwrap on
+        // optional dates reliably, so we fetch every soft-deleted row
+        // (a small set in practice) and apply the time window in Swift.
+        let descriptor = FetchDescriptor<PersistedItem>(
+            predicate: #Predicate { $0.deletedAt != nil },
+            sortBy: [SortDescriptor(\.deletedAt, order: .reverse)]
+        )
+        return try ctx.fetch(descriptor)
+            .filter { ($0.deletedAt ?? .distantPast) >= since }
+            .map { $0.toDTO() }
+    }
+
     // MARK: - Item writes
 
     public func upsert(_ item: Item, change: ChangeRecord) async throws {
@@ -64,6 +77,31 @@ public final class SwiftDataStorage: ItemStorage {
                 predicate: #Predicate { $0.folderRaw == raw }
             )
             let rows = try ctx.fetch(descriptor)
+            for row in rows {
+                ctx.delete(row)
+            }
+            for change in changes {
+                ctx.insert(PersistedChange(from: change))
+            }
+        }
+    }
+
+    public func hardDeleteItem(id: UUID, change: ChangeRecord) async throws {
+        try ctx.transaction {
+            if let row = try fetchPersistedItem(id: id) {
+                ctx.delete(row)
+            }
+            ctx.insert(PersistedChange(from: change))
+        }
+    }
+
+    public func purgeTrash(before: Date, changes: [ChangeRecord]) async throws {
+        try ctx.transaction {
+            let descriptor = FetchDescriptor<PersistedItem>(
+                predicate: #Predicate { $0.deletedAt != nil }
+            )
+            let rows = try ctx.fetch(descriptor)
+                .filter { ($0.deletedAt ?? .distantFuture) < before }
             for row in rows {
                 ctx.delete(row)
             }

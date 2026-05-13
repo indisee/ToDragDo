@@ -5,6 +5,11 @@ import Observation
 @Observable
 public final class Repository {
     public private(set) var items: [Folder: [Item]] = [:]
+    /// Soft-deleted items within the trash retention window, most recently
+    /// deleted first. Refreshed by `reload()`.
+    public private(set) var trashItems: [Item] = []
+
+    public static let trashRetention: TimeInterval = 30 * 24 * 60 * 60
 
     private let storage: any ItemStorage
     private let deviceId: String
@@ -28,6 +33,8 @@ public final class Repository {
             fresh[folder] = rows.sorted { $0.orderKey < $1.orderKey }
         }
         items = fresh
+        let cutoff = Date.now.addingTimeInterval(-Self.trashRetention)
+        trashItems = try await storage.trashItems(since: cutoff)
     }
 
     @discardableResult
@@ -88,12 +95,49 @@ public final class Repository {
         }
         let dest = try await storage.items(in: destination, includeDeleted: false)
         let nextKey = (dest.map(\.orderKey).max() ?? 0) + 1
+        let wasDone = item.folder == .done
         item.folder = destination
         item.orderKey = nextKey
         item.updatedAt = .now
         item.lastEditedBy = deviceId
+        // Dragging a trash item onto a folder tab implicitly restores it.
+        item.deletedAt = nil
+        if destination == .done {
+            item.completedAt = .now
+        } else if wasDone {
+            item.completedAt = nil
+        }
         let change = makeChange(op: .update, item: item)
         try await storage.upsert(item, change: change)
+        try await reload()
+    }
+
+    /// Restores a soft-deleted item: clears `deletedAt` and moves it to
+    /// the destination folder (defaults to Today).
+    public func restore(id: UUID, to destination: Folder = .today) async throws {
+        try await move(id: id, to: destination)
+    }
+
+    /// Hard-deletes a single item (used to purge a trash entry).
+    public func purgeItem(id: UUID) async throws {
+        guard let item = try await storage.item(id: id) else {
+            throw StorageError.notFound(id)
+        }
+        let change = makeChange(op: .hardDelete, item: item)
+        try await storage.hardDeleteItem(id: id, change: change)
+        try await reload()
+    }
+
+    /// Hard-deletes soft-deleted items older than the trash retention
+    /// window. Safe to call repeatedly; emits one change record per
+    /// purged item for the sync log.
+    public func purgeExpiredTrash(now: Date = .now) async throws {
+        let cutoff = now.addingTimeInterval(-Self.trashRetention)
+        let expired = try await storage.trashItems(since: .distantPast)
+            .filter { ($0.deletedAt ?? .distantFuture) < cutoff }
+        guard !expired.isEmpty else { return }
+        let changes = expired.map { makeChange(op: .hardDelete, item: $0) }
+        try await storage.purgeTrash(before: cutoff, changes: changes)
         try await reload()
     }
 

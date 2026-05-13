@@ -17,10 +17,22 @@ struct FolderTabBar: View {
             ForEach(Folder.allCases, id: \.self) { folder in
                 FolderTab(
                     folder: folder,
-                    isSelected: folder == panelState.selectedFolder,
+                    // In trash mode the tab bar acts as a restore target
+                    // picker (drag) and a navigation control (click), so
+                    // no single tab is "the current view".
+                    isSelected: !panelState.isTrashOpen
+                        && folder == panelState.selectedFolder,
                     count: count(for: folder),
                     isCompact: settings.panelWidth < Self.compactThreshold,
-                    action: { panelState.selectedFolder = folder }
+                    action: {
+                        // Close trash explicitly: when the user is in
+                        // trash and clicks the tab they came from, the
+                        // selectedFolder value doesn't change and its
+                        // didSet (which would otherwise close trash)
+                        // never fires.
+                        panelState.isTrashOpen = false
+                        panelState.selectedFolder = folder
+                    }
                 )
             }
         }

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import ToDragDoCore
 
@@ -16,7 +17,9 @@ struct ItemList: View {
     private static let pageSize = 10
 
     var body: some View {
-        let allItems = repository.items[panelState.selectedFolder] ?? []
+        let allItems = panelState.isTrashOpen
+            ? repository.trashItems
+            : (repository.items[panelState.selectedFolder] ?? [])
         VStack(spacing: 0) {
             if allItems.isEmpty {
                 emptyPlaceholder
@@ -42,7 +45,7 @@ struct ItemList: View {
 
         VStack(spacing: 0) {
             ForEach(visible) { item in
-                ItemRow(item: item)
+                ItemRow(item: item, trashMode: panelState.isTrashOpen)
                 if item.id != visible.last?.id {
                     Divider().opacity(0.4)
                 }
@@ -92,20 +95,34 @@ struct ItemList: View {
         }
     }
 
+    /// Gear icon → menu with Settings / Trash / Quit. Trash toggles the
+    /// hidden-folder view; the label flips to reflect current state so
+    /// the same row both opens and closes it.
     private var settingsButton: some View {
-        Button(action: { panelController.showSettings() }) {
+        Menu {
+            Button("Settings…") { panelController.showSettings() }
+                .keyboardShortcut(",", modifiers: .command)
+            Button(panelState.isTrashOpen ? "Hide Trash" : "Trash") {
+                panelState.isTrashOpen.toggle()
+            }
+            Divider()
+            Button("Quit ToDragDo") { NSApp.terminate(nil) }
+                .keyboardShortcut("q", modifiers: .command)
+        } label: {
             Image(systemName: "gearshape")
                 .font(.system(size: theme.captionSize, weight: .regular))
                 .foregroundStyle(.secondary)
                 .frame(width: 18, height: 18)
                 .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .help("Settings")
+        .menuStyle(.borderlessButton)
+        .menuIndicator(.hidden)
+        .fixedSize()
+        .help("Menu")
     }
 
     private var emptyPlaceholder: some View {
-        Text("Nothing here.")
+        Text(panelState.isTrashOpen ? "Trash is empty." : "Nothing here.")
             .font(.system(size: theme.captionSize))
             .foregroundStyle(.tertiary)
             .frame(maxWidth: .infinity)

@@ -6,9 +6,16 @@ public protocol ItemStorage: Sendable {
     func items(in folder: Folder, includeDeleted: Bool) async throws -> [Item]
     func item(id: UUID) async throws -> Item?
 
+    /// All soft-deleted items whose `deletedAt >= since`, across folders.
+    /// Backs the hidden Trash view; older items are eligible for purge.
+    func trashItems(since: Date) async throws -> [Item]
+
     func upsert(_ item: Item, change: ChangeRecord) async throws
     func softDelete(id: UUID, at deletedAt: Date, change: ChangeRecord) async throws
     func hardDelete(folder: Folder, changes: [ChangeRecord]) async throws
+    func hardDeleteItem(id: UUID, change: ChangeRecord) async throws
+    /// Hard-deletes soft-deleted items whose `deletedAt < before`.
+    func purgeTrash(before: Date, changes: [ChangeRecord]) async throws
 
     // MARK: - Outbox (per-provider)
 

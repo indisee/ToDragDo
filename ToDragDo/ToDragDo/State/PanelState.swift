@@ -12,6 +12,9 @@ final class PanelState {
             guard oldValue != selectedFolder else { return }
             currentPage = 0
             expandedItemId = nil
+            // Switching folders from the tab bar implicitly leaves the
+            // trash view.
+            isTrashOpen = false
         }
     }
     var expandedItemId: UUID? = nil
@@ -22,6 +25,16 @@ final class PanelState {
     /// whenever the selected folder changes; ItemList clamps it against
     /// the live page count when items are added or removed.
     var currentPage: Int = 0
+    /// When true, the panel shows the (hidden) Trash list instead of the
+    /// items in `selectedFolder`. Folder tabs stay visible so a trash
+    /// item can be dragged onto a tab to restore it.
+    var isTrashOpen: Bool = false {
+        didSet {
+            guard oldValue != isTrashOpen else { return }
+            currentPage = 0
+            expandedItemId = nil
+        }
+    }
 
     /// Toggle a row's expanded state. Collapses if already expanded.
     func toggleExpanded(_ id: UUID) {

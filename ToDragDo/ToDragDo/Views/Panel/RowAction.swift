@@ -9,6 +9,8 @@ enum RowAction: Hashable, Identifiable {
     case moveToLimbo
     case markDone
     case delete
+    case restore
+    case purge
 
     var id: Self { self }
 
@@ -19,6 +21,8 @@ enum RowAction: Hashable, Identifiable {
         case .moveToLimbo:    "tray"
         case .markDone:       "checkmark"
         case .delete:         "trash"
+        case .restore:        "arrow.uturn.backward"
+        case .purge:          "xmark.bin"
         }
     }
 
@@ -29,16 +33,24 @@ enum RowAction: Hashable, Identifiable {
         case .moveToLimbo:    "Move to Limbo"
         case .markDone:       "Mark Done"
         case .delete:         "Delete"
+        case .restore:        "Restore to Today"
+        case .purge:          "Delete Permanently"
         }
     }
 
     /// Action set shown for items currently in `folder`, in display order.
-    static func actions(for folder: Folder) -> [RowAction] {
+    /// When `inTrash` is true the row sits in the trash view and any
+    /// folder-move action restores the item there (move() clears
+    /// `deletedAt`); `.purge` hard-deletes it.
+    static func actions(for folder: Folder, inTrash: Bool = false) -> [RowAction] {
+        if inTrash {
+            return [.moveToToday, .moveToTomorrow, .moveToLimbo, .markDone, .purge]
+        }
         switch folder {
-        case .today:    [.moveToTomorrow, .moveToLimbo, .delete, .markDone]
-        case .tomorrow: [.moveToLimbo, .delete, .markDone]
-        case .libmo:    [.moveToToday, .delete, .markDone]
-        case .done:     [.delete]
+        case .today:    return [.moveToTomorrow, .moveToLimbo, .delete, .markDone]
+        case .tomorrow: return [.moveToLimbo, .delete, .markDone]
+        case .libmo:    return [.moveToToday, .delete, .markDone]
+        case .done:     return [.delete]
         }
     }
 }

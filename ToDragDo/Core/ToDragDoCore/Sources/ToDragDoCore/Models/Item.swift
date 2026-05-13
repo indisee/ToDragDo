@@ -17,6 +17,10 @@ public struct Item: Identifiable, Sendable, Codable, Hashable {
     /// Tomorrow. Time component is irrelevant — only the calendar day
     /// matters.
     public var dueDate: Date?
+    /// Set when the item enters Done, cleared when it leaves Done.
+    /// Distinct from `updatedAt` so subsequent edits to a Done item
+    /// (rare but possible) don't shift its archival timestamp.
+    public var completedAt: Date?
 
     public init(
         id: UUID = UUID(),
@@ -28,7 +32,8 @@ public struct Item: Identifiable, Sendable, Codable, Hashable {
         updatedAt: Date = .now,
         deletedAt: Date? = nil,
         lastEditedBy: String,
-        dueDate: Date? = nil
+        dueDate: Date? = nil,
+        completedAt: Date? = nil
     ) {
         self.id = id
         self.folder = folder
@@ -40,5 +45,6 @@ public struct Item: Identifiable, Sendable, Codable, Hashable {
         self.deletedAt = deletedAt
         self.lastEditedBy = lastEditedBy
         self.dueDate = dueDate
+        self.completedAt = completedAt
     }
 }
