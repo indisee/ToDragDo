@@ -105,7 +105,8 @@ public final class Repository: RemoteApplier {
             typeIdentifier: typeIdentifier,
             payload: payload,
             lastEditedBy: deviceId,
-            projectId: projectId
+            projectId: projectId,
+            limboEnteredAt: folder == .libmo ? .now : nil
         )
         let change = makeChange(op: .insert, item: item)
         try await storage.upsert(item, change: change)
@@ -200,10 +201,15 @@ public final class Repository: RemoteApplier {
             throw StorageError.notFound(id)
         }
         let dest = try await storage.items(in: destination, includeDeleted: false)
-        let nextKey = (dest.map(\.orderKey).max() ?? 0) + 1
+            .filter { $0.id != id }
+        // Land moved items at the TOP of the destination so the user
+        // sees them immediately — mirrors `add()`'s prepend behavior.
+        // In Done this also means most-recently-finished sits first.
+        let firstKey = dest.map(\.orderKey).min() ?? 1
         let wasDone = item.folder == .done
+        let wasInLimbo = item.folder == .libmo
         item.folder = destination
-        item.orderKey = nextKey
+        item.orderKey = firstKey - 1
         item.updatedAt = .now
         item.lastEditedBy = deviceId
         // Dragging a trash item onto a folder tab implicitly restores it.
@@ -212,6 +218,13 @@ public final class Repository: RemoteApplier {
             item.completedAt = .now
         } else if wasDone {
             item.completedAt = nil
+        }
+        // Limbo idle timer: start on entry, leave alone on within-Limbo
+        // moves (drag-to-tab while already there), clear on exit.
+        if destination == .libmo {
+            if !wasInLimbo { item.limboEnteredAt = .now }
+        } else {
+            item.limboEnteredAt = nil
         }
         let change = makeChange(op: .update, item: item)
         try await storage.upsert(item, change: change)
@@ -222,6 +235,21 @@ public final class Repository: RemoteApplier {
     /// the destination folder (defaults to Today).
     public func restore(id: UUID, to destination: Folder = .today) async throws {
         try await move(id: id, to: destination)
+    }
+
+    /// Resets the Limbo idle timer for `id` (only if the item currently
+    /// sits in Limbo). Called when the user opens a Limbo row so it
+    /// stops blinking. No-op for non-Limbo items so opens elsewhere
+    /// don't churn the outbox.
+    public func noteOpened(id: UUID) async throws {
+        guard var item = try await storage.item(id: id) else { return }
+        guard item.folder == .libmo else { return }
+        item.limboEnteredAt = .now
+        item.updatedAt = .now
+        item.lastEditedBy = deviceId
+        let change = makeChange(op: .update, item: item)
+        try await storage.upsert(item, change: change)
+        try await reloadAndNotify()
     }
 
     /// Hard-deletes a single item (used to purge a trash entry).
@@ -347,8 +375,14 @@ public final class Repository: RemoteApplier {
             let target = destinationFolder(for: date, now: now, calendar: calendar)
             if item.folder != target {
                 let dest = try await storage.items(in: target, includeDeleted: false)
+                let wasInLimbo = item.folder == .libmo
                 item.folder = target
                 item.orderKey = (dest.map(\.orderKey).max() ?? 0) + 1
+                if target == .libmo {
+                    if !wasInLimbo { item.limboEnteredAt = .now }
+                } else {
+                    item.limboEnteredAt = nil
+                }
             }
         }
 
@@ -390,6 +424,7 @@ public final class Repository: RemoteApplier {
             item.orderKey = todayKey
             item.updatedAt = stamp
             item.lastEditedBy = deviceId
+            item.limboEnteredAt = nil
             let change = makeChange(op: .update, item: item)
             try await storage.upsert(item, change: change)
         }
@@ -399,6 +434,7 @@ public final class Repository: RemoteApplier {
             item.orderKey = tomorrowKey
             item.updatedAt = stamp
             item.lastEditedBy = deviceId
+            item.limboEnteredAt = nil
             let change = makeChange(op: .update, item: item)
             try await storage.upsert(item, change: change)
         }

@@ -18,6 +18,7 @@ final class PersistedItem {
     /// Defaulted so existing rows lightweight-migrate to Work without
     /// schema surgery. Stays in sync with `Item.projectId`.
     var projectId: UUID = Project.workId
+    var limboEnteredAt: Date?
 
     init(from dto: Item) {
         self.id = dto.id
@@ -32,6 +33,7 @@ final class PersistedItem {
         self.projectId = dto.projectId
         self.dueDate = dto.dueDate
         self.completedAt = dto.completedAt
+        self.limboEnteredAt = dto.limboEnteredAt
     }
 
     func apply(_ dto: Item) {
@@ -45,6 +47,7 @@ final class PersistedItem {
         self.projectId = dto.projectId
         self.dueDate = dto.dueDate
         self.completedAt = dto.completedAt
+        self.limboEnteredAt = dto.limboEnteredAt
     }
 
     func toDTO() -> Item {
@@ -60,7 +63,8 @@ final class PersistedItem {
             lastEditedBy: lastEditedBy,
             projectId: projectId,
             dueDate: dueDate,
-            completedAt: completedAt
+            completedAt: completedAt,
+            limboEnteredAt: limboEnteredAt
         )
     }
 }

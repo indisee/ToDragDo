@@ -15,6 +15,23 @@ struct GeneralSettingsView: View {
                 Toggle("Hide during screen sharing", isOn: $settings.hideFromScreenSharing)
             }
 
+            Section("Limbo") {
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Stepper(
+                        value: $settings.limboBlinkDays,
+                        in: AppSettings.limboBlinkDaysRange
+                    ) {
+                        Text(limboBlinkLabel)
+                    }
+                    .fixedSize()
+                    Text(limboBlinkHint)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+            }
+
             Section("Data Location") {
                 HStack(alignment: .top, spacing: 8) {
                     Text(dataLocation.resolvedDirectory.path)
@@ -43,6 +60,19 @@ struct GeneralSettingsView: View {
         }
         .padding(20)
         .frame(width: 480)
+    }
+
+    private var limboBlinkLabel: LocalizedStringKey {
+        let n = settings.limboBlinkDays
+        if n == 0 { return "Days before Limbo blinks: off" }
+        if n == 1 { return "Days before Limbo blinks: 1 day" }
+        return "Days before Limbo blinks: \(n) days"
+    }
+
+    private var limboBlinkHint: LocalizedStringKey {
+        settings.limboBlinkDays == 0
+            ? "Limbo items never blink."
+            : "Items idle in Limbo this long start blinking red. Opening an item resets its timer."
     }
 
     private func copyPath() {

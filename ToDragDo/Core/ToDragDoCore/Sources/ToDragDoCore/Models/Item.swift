@@ -26,6 +26,13 @@ public struct Item: Identifiable, Sendable, Codable, Hashable {
     /// Distinct from `updatedAt` so subsequent edits to a Done item
     /// (rare but possible) don't shift its archival timestamp.
     public var completedAt: Date?
+    /// Drives the "stale Limbo" blink: the moment the item's Limbo
+    /// idle-timer was last (re)started. Set on entry into Limbo and
+    /// reset every time the user opens the row while it sits in Limbo;
+    /// cleared when the item leaves Limbo. Nil for items that never
+    /// visited Limbo. The threshold (X days) is a user setting; this
+    /// field carries the per-item state across devices.
+    public var limboEnteredAt: Date?
 
     public init(
         id: UUID = UUID(),
@@ -39,7 +46,8 @@ public struct Item: Identifiable, Sendable, Codable, Hashable {
         lastEditedBy: String,
         projectId: UUID = Project.workId,
         dueDate: Date? = nil,
-        completedAt: Date? = nil
+        completedAt: Date? = nil,
+        limboEnteredAt: Date? = nil
     ) {
         self.id = id
         self.folder = folder
@@ -53,12 +61,13 @@ public struct Item: Identifiable, Sendable, Codable, Hashable {
         self.projectId = projectId
         self.dueDate = dueDate
         self.completedAt = completedAt
+        self.limboEnteredAt = limboEnteredAt
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, folder, orderKey, typeIdentifier, payload
         case createdAt, updatedAt, deletedAt, lastEditedBy
-        case projectId, dueDate, completedAt
+        case projectId, dueDate, completedAt, limboEnteredAt
     }
 
     public init(from decoder: Decoder) throws {
@@ -78,5 +87,6 @@ public struct Item: Identifiable, Sendable, Codable, Hashable {
         self.projectId = try c.decodeIfPresent(UUID.self, forKey: .projectId) ?? Project.workId
         self.dueDate = try c.decodeIfPresent(Date.self, forKey: .dueDate)
         self.completedAt = try c.decodeIfPresent(Date.self, forKey: .completedAt)
+        self.limboEnteredAt = try c.decodeIfPresent(Date.self, forKey: .limboEnteredAt)
     }
 }

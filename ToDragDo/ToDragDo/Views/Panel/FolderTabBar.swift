@@ -13,27 +13,40 @@ struct FolderTabBar: View {
     private static let compactThreshold: CGFloat = 400
 
     var body: some View {
-        HStack(spacing: 4) {
-            ForEach(Folder.allCases, id: \.self) { folder in
-                FolderTab(
-                    folder: folder,
-                    // In trash mode the tab bar acts as a restore target
-                    // picker (drag) and a navigation control (click), so
-                    // no single tab is "the current view".
-                    isSelected: !panelState.isTrashOpen
-                        && folder == panelState.selectedFolder,
-                    count: count(for: folder),
-                    isCompact: settings.panelWidth < Self.compactThreshold,
-                    action: {
-                        // Close trash explicitly: when the user is in
-                        // trash and clicks the tab they came from, the
-                        // selectedFolder value doesn't change and its
-                        // didSet (which would otherwise close trash)
-                        // never fires.
-                        panelState.isTrashOpen = false
-                        panelState.selectedFolder = folder
-                    }
-                )
+        // Recompute staleness once per render — TimelineView keeps the
+        // Limbo badge in sync with wall-clock time even when nothing else
+        // in the panel changes, so items cross the threshold without
+        // requiring a panel toggle.
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            let now = context.date
+            let limboBlinks = LimboStaleness.anyStale(
+                in: repository.items[.libmo] ?? [],
+                threshold: settings.limboBlinkDays,
+                now: now
+            )
+            HStack(spacing: 4) {
+                ForEach(Folder.allCases, id: \.self) { folder in
+                    FolderTab(
+                        folder: folder,
+                        // In trash mode the tab bar acts as a restore target
+                        // picker (drag) and a navigation control (click), so
+                        // no single tab is "the current view".
+                        isSelected: !panelState.isTrashOpen
+                            && folder == panelState.selectedFolder,
+                        count: count(for: folder),
+                        isCompact: settings.panelWidth < Self.compactThreshold,
+                        blinkBadge: folder == .libmo && limboBlinks,
+                        action: {
+                            // Close trash explicitly: when the user is in
+                            // trash and clicks the tab they came from, the
+                            // selectedFolder value doesn't change and its
+                            // didSet (which would otherwise close trash)
+                            // never fires.
+                            panelState.isTrashOpen = false
+                            panelState.selectedFolder = folder
+                        }
+                    )
+                }
             }
         }
     }

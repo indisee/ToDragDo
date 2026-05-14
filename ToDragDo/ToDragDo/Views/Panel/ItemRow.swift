@@ -29,6 +29,7 @@ struct ItemRow: View {
     @Environment(Repository.self) private var repository
     @Environment(PanelState.self) private var panelState
     @Environment(DragSession.self) private var session
+    @Environment(AppSettings.self) private var settings
 
     let item: Item
     var trashMode: Bool = false
@@ -309,11 +310,30 @@ struct ItemRow: View {
 
     @ViewBuilder
     private var rowBackground: some View {
-        if isHovered {
+        if isStaleInLimbo {
+            // Pulsing red wash signals "this has sat in Limbo too long".
+            // Layered under any hover tint so the warning still shows
+            // when the cursor isn't over the row.
+            Color.red
+                .phaseAnimator([0.06, 0.22]) { content, opacity in
+                    content.opacity(opacity)
+                } animation: { _ in
+                    .easeInOut(duration: 0.7)
+                }
+                .overlay(isHovered ? theme.accent.opacity(0.06) : Color.clear)
+        } else if isHovered {
             theme.accent.opacity(0.06)
         } else {
             Color.clear
         }
+    }
+
+    /// Recomputed when the parent re-renders (the panel re-evaluates on
+    /// every Repository write and on the FolderTabBar's TimelineView
+    /// tick), so a row that crosses the threshold while the panel is
+    /// open does pick up the pulse on the next refresh.
+    private var isStaleInLimbo: Bool {
+        LimboStaleness.isStale(item, threshold: settings.limboBlinkDays)
     }
 
     // MARK: - Helpers
@@ -364,6 +384,15 @@ struct ItemRow: View {
     // keeps the row and the window in sync.
     private func open() {
         panelState.openItem(item.id)
+        // Reset the Limbo idle timer if this is a Limbo row. `noteOpened`
+        // is a no-op for non-Limbo items, but we gate on the local view
+        // of the folder anyway so we don't enqueue a stray write per tap.
+        if item.folder == .libmo {
+            let id = item.id
+            Task {
+                try? await repository.noteOpened(id: id)
+            }
+        }
     }
 
     private func close() {

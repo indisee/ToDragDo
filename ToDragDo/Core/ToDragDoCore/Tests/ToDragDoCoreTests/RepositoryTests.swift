@@ -69,7 +69,7 @@ struct RepositoryTests {
         #expect(pending.last?.op == .update)
     }
 
-    @Test("move changes folder and assigns end-of-destination orderKey")
+    @Test("move changes folder and prepends to the destination")
     func moveTransitionsFolder() async throws {
         let (repo, _) = makeSUT()
         let a = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data())
@@ -79,9 +79,24 @@ struct RepositoryTests {
 
         let tomorrow = try #require(repo.items[.tomorrow])
         #expect(tomorrow.count == 2)
-        #expect(tomorrow.last?.id == a.id)
-        #expect(tomorrow.last!.orderKey > b.orderKey)
+        #expect(tomorrow.first?.id == a.id)
+        #expect(tomorrow.first!.orderKey < b.orderKey)
         #expect(repo.items[.today]?.isEmpty == true)
+    }
+
+    @Test("move to Done prepends — most recently finished first")
+    func moveToDonePrependsMostRecent() async throws {
+        let (repo, _) = makeSUT()
+        let a = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data("a".utf8))
+        let b = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data("b".utf8))
+        let c = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data("c".utf8))
+
+        try await repo.move(id: a.id, to: .done)
+        try await repo.move(id: b.id, to: .done)
+        try await repo.move(id: c.id, to: .done)
+
+        let order = try #require(repo.items[.done]).map(\.id)
+        #expect(order == [c.id, b.id, a.id])
     }
 
     @Test("softDelete hides the item from default reads but keeps the row")
@@ -242,6 +257,69 @@ struct RepositoryTests {
         // The local item table is unchanged — resync only touches the outbox.
         let storageCount = await storage.itemCount()
         #expect(storageCount == 3)
+    }
+
+    @Test("add into Limbo seeds limboEnteredAt; other folders leave it nil")
+    func addSeedsLimboTimer() async throws {
+        let (repo, _) = makeSUT()
+        let inLimbo = try await repo.add(folder: .libmo, typeIdentifier: "t", payload: Data())
+        let inToday = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data())
+        #expect(inLimbo.limboEnteredAt != nil)
+        #expect(inToday.limboEnteredAt == nil)
+    }
+
+    @Test("move into Limbo sets the idle timer; move out clears it")
+    func moveTogglesLimboTimer() async throws {
+        let (repo, _) = makeSUT()
+        let item = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data())
+        try await repo.move(id: item.id, to: .libmo)
+        var fetched = try #require(repo.items[.libmo]?.first { $0.id == item.id })
+        #expect(fetched.limboEnteredAt != nil)
+
+        try await repo.move(id: item.id, to: .today)
+        fetched = try #require(repo.items[.today]?.first { $0.id == item.id })
+        #expect(fetched.limboEnteredAt == nil)
+    }
+
+    @Test("move within Limbo (drag onto same tab) preserves the timer")
+    func moveWithinLimboPreservesTimer() async throws {
+        let (repo, _) = makeSUT()
+        let item = try await repo.add(folder: .libmo, typeIdentifier: "t", payload: Data())
+        let originalEntered = try #require(item.limboEnteredAt)
+
+        // Wait a tick so any reset would produce a measurably newer date.
+        try await Task.sleep(nanoseconds: 5_000_000)
+        try await repo.move(id: item.id, to: .libmo)
+        let fetched = try #require(repo.items[.libmo]?.first { $0.id == item.id })
+        #expect(fetched.limboEnteredAt == originalEntered)
+    }
+
+    @Test("noteOpened resets the timer for a Limbo item")
+    func noteOpenedResetsLimboTimer() async throws {
+        let (repo, _) = makeSUT()
+        let item = try await repo.add(folder: .libmo, typeIdentifier: "t", payload: Data())
+        let originalEntered = try #require(item.limboEnteredAt)
+
+        try await Task.sleep(nanoseconds: 5_000_000)
+        try await repo.noteOpened(id: item.id)
+        let fetched = try #require(repo.items[.libmo]?.first { $0.id == item.id })
+        let updated = try #require(fetched.limboEnteredAt)
+        #expect(updated > originalEntered)
+    }
+
+    @Test("noteOpened is a no-op for non-Limbo items")
+    func noteOpenedNoOpOutsideLimbo() async throws {
+        let (repo, _) = makeSUT()
+        let item = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data())
+
+        let pendingBefore = try await repo.pendingChanges(for: Self.provider).count
+        try await repo.noteOpened(id: item.id)
+        let pendingAfter = try await repo.pendingChanges(for: Self.provider).count
+
+        // No outbox row produced — the open didn't trigger a write.
+        #expect(pendingAfter == pendingBefore)
+        let fetched = try #require(repo.items[.today]?.first { $0.id == item.id })
+        #expect(fetched.limboEnteredAt == nil)
     }
 
     @Test("ChangeRecord snapshot decodes back to the saved Item")

@@ -13,6 +13,10 @@ struct FolderTab: View {
     let isSelected: Bool
     let count: Int?
     let isCompact: Bool
+    /// True when this tab's count badge should pulse red — used by Limbo
+    /// to surface stale items at a glance. Independent of `isSelected`
+    /// so the warning is visible from any tab.
+    var blinkBadge: Bool = false
     let action: () -> Void
 
     @State private var isDropTargeted = false
@@ -28,18 +32,7 @@ struct FolderTab: View {
                         .fixedSize(horizontal: false, vertical: true)
                         .layoutPriority(isSelected ? 1 : 0)
                 }
-                Text("\(count ?? 0)")
-                    .font(.system(size: theme.captionSize - 1, weight: .bold))
-                    .foregroundStyle(isSelected ? .white : .secondary)
-                    .lineLimit(1)
-                    .fixedSize()
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(
-                        isSelected ? theme.accent : theme.accent.opacity(0.12),
-                        in: Capsule()
-                    )
-                    .accessibilityLabel(folder.displayName)
+                countBadge
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
@@ -51,6 +44,39 @@ struct FolderTab: View {
         .onDrop(of: [.url], isTargeted: $isDropTargeted) { providers in
             handleDrop(providers)
         }
+    }
+
+    @ViewBuilder
+    private var countBadge: some View {
+        let label = Text("\(count ?? 0)")
+            .font(.system(size: theme.captionSize - 1, weight: .bold))
+            .foregroundStyle(badgeForeground)
+            .lineLimit(1)
+            .fixedSize()
+            .padding(.horizontal, 5)
+            .padding(.vertical, 1)
+            .accessibilityLabel(folder.displayName)
+
+        if blinkBadge {
+            label.background {
+                Capsule()
+                    .fill(Color.red)
+                    .phaseAnimator([0.55, 1.0]) { content, opacity in
+                        content.opacity(opacity)
+                    } animation: { _ in
+                        .easeInOut(duration: 0.7)
+                    }
+            }
+        } else if isSelected {
+            label.background(theme.accent, in: Capsule())
+        } else {
+            label.background(theme.accent.opacity(0.12), in: Capsule())
+        }
+    }
+
+    private var badgeForeground: Color {
+        if blinkBadge { return .white }
+        return isSelected ? .white : .secondary
     }
 
     private var background: Color {

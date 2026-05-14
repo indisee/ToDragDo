@@ -13,6 +13,12 @@ final class AppSettings {
     static let panelWidthRange: ClosedRange<CGFloat> = 220...720
     static let defaultPanelWidth: CGFloat = 420
 
+    /// Bounds for the "Days before Limbo starts to blink" stepper.
+    /// Zero disables the feature entirely. Upper bound stops the
+    /// stepper from running off into nonsense values.
+    static let limboBlinkDaysRange: ClosedRange<Int> = 0...90
+    static let defaultLimboBlinkDays: Int = 7
+
     var appearance: AppearanceMode {
         didSet { defaults.set(appearance.rawValue, forKey: Keys.appearance) }
     }
@@ -43,6 +49,22 @@ final class AppSettings {
         didSet { defaults.set(iCloudSyncEnabled, forKey: Keys.iCloudSyncEnabled) }
     }
 
+    /// Days an item may sit untouched in Limbo before its row (and the
+    /// Limbo tab's count badge) start blinking red. Zero disables the
+    /// blink entirely. Persisted locally; the per-item idle timestamp
+    /// (`Item.limboEnteredAt`) is what actually syncs across devices,
+    /// so each user can pick their own threshold.
+    var limboBlinkDays: Int {
+        didSet {
+            let clamped = Self.clampLimboBlinkDays(limboBlinkDays)
+            if clamped != limboBlinkDays {
+                limboBlinkDays = clamped
+                return
+            }
+            defaults.set(limboBlinkDays, forKey: Keys.limboBlinkDays)
+        }
+    }
+
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -53,10 +75,16 @@ final class AppSettings {
         self.panelWidth = Self.clamp(CGFloat(storedWidth ?? Double(Self.defaultPanelWidth)))
         self.hideFromScreenSharing = defaults.object(forKey: Keys.hideFromScreenSharing) as? Bool ?? true
         self.iCloudSyncEnabled = defaults.object(forKey: Keys.iCloudSyncEnabled) as? Bool ?? true
+        let storedBlinkDays = defaults.object(forKey: Keys.limboBlinkDays) as? Int
+        self.limboBlinkDays = Self.clampLimboBlinkDays(storedBlinkDays ?? Self.defaultLimboBlinkDays)
     }
 
     private static func clamp(_ width: CGFloat) -> CGFloat {
         min(max(width, panelWidthRange.lowerBound), panelWidthRange.upperBound)
+    }
+
+    private static func clampLimboBlinkDays(_ value: Int) -> Int {
+        min(max(value, limboBlinkDaysRange.lowerBound), limboBlinkDaysRange.upperBound)
     }
 
     /// Reads the current persisted value of `hideFromScreenSharing`
@@ -72,5 +100,6 @@ final class AppSettings {
         static let panelWidth = "todragdo.panelWidth"
         static let hideFromScreenSharing = "todragdo.hideFromScreenSharing"
         static let iCloudSyncEnabled = "todragdo.sync.icloud.userEnabled"
+        static let limboBlinkDays = "todragdo.limboBlinkDays"
     }
 }
