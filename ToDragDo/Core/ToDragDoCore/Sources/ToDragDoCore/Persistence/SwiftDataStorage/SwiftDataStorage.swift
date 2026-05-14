@@ -6,12 +6,44 @@ import SwiftData
 public final class SwiftDataStorage: ItemStorage {
     private let container: ModelContainer
 
-    public init(inMemory: Bool = false) throws {
+    /// Open (or create) the SwiftData store.
+    /// - Parameters:
+    ///   - inMemory: when `true`, ignores `url` and creates an in-memory
+    ///     store (used as a last-ditch fallback when disk is unusable).
+    ///   - url: explicit on-disk location for the `.store` file. When
+    ///     `nil` and `inMemory == false`, SwiftData uses its default
+    ///     location (`Application Support/default.store` inside the
+    ///     sandbox container).
+    public init(inMemory: Bool = false, url: URL? = nil) throws {
         let schema = Schema(versionedSchema: SchemaV1.self)
-        let config = ModelConfiguration(
-            schema: schema,
-            isStoredInMemoryOnly: inMemory
-        )
+        // `cloudKitDatabase: .none` is critical: with the app's iCloud
+        // entitlements present, SwiftData's default `.automatic` mode
+        // tries to bind the store to a CloudKit mirror against our
+        // container. We drive CloudKit ourselves via `CKSyncEngine` in
+        // `CloudKitRemoteAdapter`; leaving SwiftData's auto-mirror on
+        // throws `loadIssueModelContainer` here when the container isn't
+        // fully provisioned, AND would duplicate every write if it did
+        // bind successfully.
+        let config: ModelConfiguration
+        if inMemory {
+            config = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: true,
+                cloudKitDatabase: .none
+            )
+        } else if let url {
+            config = ModelConfiguration(
+                schema: schema,
+                url: url,
+                cloudKitDatabase: .none
+            )
+        } else {
+            config = ModelConfiguration(
+                schema: schema,
+                isStoredInMemoryOnly: false,
+                cloudKitDatabase: .none
+            )
+        }
         self.container = try ModelContainer(for: schema, configurations: config)
     }
 
@@ -51,6 +83,12 @@ public final class SwiftDataStorage: ItemStorage {
     // MARK: - Item writes
 
     public func upsert(_ item: Item, change: ChangeRecord) async throws {
+        try upsertSync(item, change: change)
+    }
+
+    /// Same as ``upsert(_:change:)`` but synchronous — used by the rescue
+    /// path, which has to re-import items from a non-async context.
+    func upsertSync(_ item: Item, change: ChangeRecord) throws {
         try ctx.transaction {
             if let existing = try fetchPersistedItem(id: item.id) {
                 existing.apply(item)
@@ -185,6 +223,38 @@ public final class SwiftDataStorage: ItemStorage {
     public func syncStatus(forChange changeId: UUID, providerId: String) async throws -> ChangeSyncStatus? {
         guard let change = try fetchChange(id: changeId) else { return nil }
         return change.status(for: providerId)?.toDTO()
+    }
+
+    // MARK: - Remote apply (no outbox row)
+
+    public func upsertWithoutChange(_ item: Item) async throws {
+        try ctx.transaction {
+            if let existing = try fetchPersistedItem(id: item.id) {
+                // LWW: drop the remote write if our local copy is newer
+                // (or tied — older device echoes its own writes back).
+                if existing.updatedAt >= item.updatedAt { return }
+                existing.apply(item)
+            } else {
+                ctx.insert(PersistedItem(from: item))
+            }
+        }
+    }
+
+    public func softDeleteWithoutChange(id: UUID, at deletedAt: Date) async throws {
+        try ctx.transaction {
+            guard let row = try fetchPersistedItem(id: id) else { return }
+            if row.updatedAt > deletedAt { return }
+            row.deletedAt = deletedAt
+            row.updatedAt = deletedAt
+        }
+    }
+
+    public func hardDeleteWithoutChange(id: UUID) async throws {
+        try ctx.transaction {
+            if let row = try fetchPersistedItem(id: id) {
+                ctx.delete(row)
+            }
+        }
     }
 
     // MARK: - Helpers

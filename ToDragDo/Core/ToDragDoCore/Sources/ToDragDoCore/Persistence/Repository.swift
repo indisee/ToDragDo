@@ -3,7 +3,7 @@ import Observation
 
 @MainActor
 @Observable
-public final class Repository {
+public final class Repository: RemoteApplier {
     public private(set) var items: [Folder: [Item]] = [:]
     /// Soft-deleted items within the trash retention window, most recently
     /// deleted first. Refreshed by `reload()`.
@@ -12,8 +12,19 @@ public final class Repository {
     public static let trashRetention: TimeInterval = 30 * 24 * 60 * 60
 
     private let storage: any ItemStorage
-    private let deviceId: String
+    public let deviceId: String
     private let encoder: JSONEncoder
+    private let decoder: JSONDecoder
+
+    /// Fires after every user-initiated write (add, update, move, delete,
+    /// rollover, …) — once `reload()` has refreshed the published state.
+    /// Not called from `applyRemote(_:)` because remote-pulled changes
+    /// shouldn't trigger another sync round.
+    ///
+    /// Excluded from `@Observable` tracking so views that read repository
+    /// state don't redraw when the callback is (re)assigned.
+    @ObservationIgnored
+    public var onWriteCallback: (@MainActor () -> Void)?
 
     public init(storage: any ItemStorage, deviceId: String = DeviceID.current) {
         self.storage = storage
@@ -21,6 +32,9 @@ public final class Repository {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         self.encoder = encoder
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        self.decoder = decoder
         for folder in Folder.allCases {
             items[folder] = []
         }
@@ -35,6 +49,15 @@ public final class Repository {
         items = fresh
         let cutoff = Date.now.addingTimeInterval(-Self.trashRetention)
         trashItems = try await storage.trashItems(since: cutoff)
+    }
+
+    /// `reload()` + fire `onWriteCallback`. Used by every user-initiated
+    /// write so the host (e.g., `SyncCoordinator`) can react immediately.
+    /// `applyRemote(_:)` deliberately uses plain `reload()` instead, so
+    /// pulled remote changes don't trigger another push cycle.
+    private func reloadAndNotify() async throws {
+        try await reload()
+        onWriteCallback?()
     }
 
     @discardableResult
@@ -56,7 +79,7 @@ public final class Repository {
         )
         let change = makeChange(op: .insert, item: item)
         try await storage.upsert(item, change: change)
-        try await reload()
+        try await reloadAndNotify()
         return item
     }
 
@@ -69,7 +92,7 @@ public final class Repository {
         item.lastEditedBy = deviceId
         let change = makeChange(op: .update, item: item)
         try await storage.upsert(item, change: change)
-        try await reload()
+        try await reloadAndNotify()
     }
 
     /// Append `attachment` to an existing item's payload. The item's
@@ -86,7 +109,7 @@ public final class Repository {
         item.lastEditedBy = deviceId
         let change = makeChange(op: .update, item: item)
         try await storage.upsert(item, change: change)
-        try await reload()
+        try await reloadAndNotify()
     }
 
     public func move(id: UUID, to destination: Folder) async throws {
@@ -109,7 +132,7 @@ public final class Repository {
         }
         let change = makeChange(op: .update, item: item)
         try await storage.upsert(item, change: change)
-        try await reload()
+        try await reloadAndNotify()
     }
 
     /// Restores a soft-deleted item: clears `deletedAt` and moves it to
@@ -125,7 +148,7 @@ public final class Repository {
         }
         let change = makeChange(op: .hardDelete, item: item)
         try await storage.hardDeleteItem(id: id, change: change)
-        try await reload()
+        try await reloadAndNotify()
     }
 
     /// Hard-deletes soft-deleted items older than the trash retention
@@ -138,7 +161,7 @@ public final class Repository {
         guard !expired.isEmpty else { return }
         let changes = expired.map { makeChange(op: .hardDelete, item: $0) }
         try await storage.purgeTrash(before: cutoff, changes: changes)
-        try await reload()
+        try await reloadAndNotify()
     }
 
     /// Reorder `id` to sit immediately before `targetId` within the same folder.
@@ -169,7 +192,7 @@ public final class Repository {
         item.lastEditedBy = deviceId
         let change = makeChange(op: .update, item: item)
         try await storage.upsert(item, change: change)
-        try await reload()
+        try await reloadAndNotify()
     }
 
     public func softDelete(id: UUID) async throws {
@@ -182,7 +205,7 @@ public final class Repository {
         item.lastEditedBy = deviceId
         let change = makeChange(op: .softDelete, item: item)
         try await storage.softDelete(id: id, at: now, change: change)
-        try await reload()
+        try await reloadAndNotify()
     }
 
     /// Day rollover: items left in Today move to Tomorrow, then Tomorrow
@@ -215,7 +238,7 @@ public final class Repository {
         }
 
         try await promoteScheduledItems(now: now, calendar: calendar, reloadAfter: false)
-        try await reload()
+        try await reloadAndNotify()
     }
 
     /// Sets (or clears) `dueDate` on an item and routes it to the right
@@ -248,7 +271,7 @@ public final class Repository {
 
         let change = makeChange(op: .update, item: item)
         try await storage.upsert(item, change: change)
-        try await reload()
+        try await reloadAndNotify()
     }
 
     /// Scans Limbo for items whose `dueDate` has arrived and moves them:
@@ -297,7 +320,7 @@ public final class Repository {
             try await storage.upsert(item, change: change)
         }
         if reloadAfter {
-            try await reload()
+            try await reloadAndNotify()
         }
     }
 
@@ -320,7 +343,7 @@ public final class Repository {
         let dones = try await storage.items(in: .done, includeDeleted: true)
         let changes = dones.map { makeChange(op: .hardDelete, item: $0) }
         try await storage.hardDelete(folder: .done, changes: changes)
-        try await reload()
+        try await reloadAndNotify()
     }
 
     public func pendingChanges(
@@ -351,6 +374,35 @@ public final class Repository {
         providerId: String
     ) async throws -> ChangeSyncStatus? {
         try await storage.syncStatus(forChange: changeId, providerId: providerId)
+    }
+
+    /// Apply remote ChangeRecords pulled by a `RemoteAdapter`. Routes each
+    /// record to the storage's `*WithoutChange` methods so we don't echo
+    /// the change back into the outbox. Records originating from this
+    /// device are dropped — they're either echoes of our own pushes or
+    /// records we already wrote locally.
+    public func applyRemote(_ records: [ChangeRecord]) async throws {
+        var changed = false
+        for record in records where record.deviceId != deviceId {
+            switch record.op {
+            case .insert, .update:
+                let item = try decoder.decode(Item.self, from: record.snapshot)
+                try await storage.upsertWithoutChange(item)
+            case .softDelete:
+                let item = try? decoder.decode(Item.self, from: record.snapshot)
+                let at = item?.deletedAt ?? record.ts
+                try await storage.softDeleteWithoutChange(id: record.entityId, at: at)
+            case .hardDelete:
+                try await storage.hardDeleteWithoutChange(id: record.entityId)
+            }
+            changed = true
+        }
+        if changed {
+            // applyRemote is the post-pull path — use plain `reload()` so
+            // we don't recursively trigger another sync round on records
+            // that came *from* the remote.
+            try await reload()
+        }
     }
 
     private func makeChange(op: ChangeOp, item: Item) -> ChangeRecord {

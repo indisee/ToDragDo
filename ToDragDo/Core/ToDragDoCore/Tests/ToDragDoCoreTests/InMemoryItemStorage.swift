@@ -101,6 +101,25 @@ actor InMemoryItemStorage: ItemStorage {
         statuses[changeId]?[providerId]
     }
 
+    // MARK: - Remote apply (no outbox row)
+
+    func upsertWithoutChange(_ item: Item) async throws {
+        if let existing = items[item.id], existing.updatedAt >= item.updatedAt { return }
+        items[item.id] = item
+    }
+
+    func softDeleteWithoutChange(id: UUID, at deletedAt: Date) async throws {
+        guard var existing = items[id] else { return }
+        if existing.updatedAt > deletedAt { return }
+        existing.deletedAt = deletedAt
+        existing.updatedAt = deletedAt
+        items[id] = existing
+    }
+
+    func hardDeleteWithoutChange(id: UUID) async throws {
+        items.removeValue(forKey: id)
+    }
+
     // MARK: - Test helpers
 
     func allChanges() -> [ChangeRecord] {

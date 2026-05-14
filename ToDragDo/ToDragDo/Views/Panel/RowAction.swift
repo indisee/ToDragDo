@@ -44,12 +44,12 @@ enum RowAction: Hashable, Identifiable {
     /// `deletedAt`); `.purge` hard-deletes it.
     static func actions(for folder: Folder, inTrash: Bool = false) -> [RowAction] {
         if inTrash {
-            return [.moveToToday, .moveToTomorrow, .moveToLimbo, .markDone, .purge]
+            return [.moveToTomorrow, .markDone, .purge]
         }
         switch folder {
-        case .today:    return [.moveToTomorrow, .moveToLimbo, .delete, .markDone]
-        case .tomorrow: return [.moveToLimbo, .delete, .markDone]
-        case .libmo:    return [.moveToToday, .delete, .markDone]
+        case .today:    return [.moveToTomorrow, .delete, .markDone]
+        case .tomorrow: return [.delete, .markDone]
+        case .libmo:    return [.delete, .markDone]
         case .done:     return [.delete]
         }
     }

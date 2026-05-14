@@ -36,6 +36,13 @@ final class AppSettings {
         didSet { defaults.set(hideFromScreenSharing, forKey: Keys.hideFromScreenSharing) }
     }
 
+    /// User preference for iCloud sync. Defaults to `true`; the
+    /// `CloudKitAccountWatcher` only flips the coordinator on when this is
+    /// true *and* the iCloud account is available.
+    var iCloudSyncEnabled: Bool {
+        didSet { defaults.set(iCloudSyncEnabled, forKey: Keys.iCloudSyncEnabled) }
+    }
+
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -45,6 +52,7 @@ final class AppSettings {
         let storedWidth = defaults.object(forKey: Keys.panelWidth) as? Double
         self.panelWidth = Self.clamp(CGFloat(storedWidth ?? Double(Self.defaultPanelWidth)))
         self.hideFromScreenSharing = defaults.object(forKey: Keys.hideFromScreenSharing) as? Bool ?? true
+        self.iCloudSyncEnabled = defaults.object(forKey: Keys.iCloudSyncEnabled) as? Bool ?? true
     }
 
     private static func clamp(_ width: CGFloat) -> CGFloat {
@@ -63,5 +71,6 @@ final class AppSettings {
         static let appearance = "todragdo.appearance"
         static let panelWidth = "todragdo.panelWidth"
         static let hideFromScreenSharing = "todragdo.hideFromScreenSharing"
+        static let iCloudSyncEnabled = "todragdo.sync.icloud.userEnabled"
     }
 }

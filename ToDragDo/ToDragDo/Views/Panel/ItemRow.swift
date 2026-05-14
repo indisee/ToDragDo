@@ -55,7 +55,13 @@ struct ItemRow: View {
             .draggableWhenClosed(!isExpanded, payload: ItemDragURL.url(for: item.id)) {
                 dragPreview
             }
-            .tapWhenClosed(!isExpanded) { open() }
+            .onTapGesture {
+                // Closed: tap anywhere opens. Expanded: tap on free space
+                // closes. Text selection still works because it uses drag,
+                // not tap. Buttons/links inside the row consume their own
+                // taps before this gesture fires.
+                if isExpanded { close() } else { open() }
+            }
     }
 
     // MARK: - Core (visual + drop targets)
@@ -134,7 +140,7 @@ struct ItemRow: View {
     @ViewBuilder
     private var noteText: some View {
         if isExpanded {
-            Text(displayText)
+            Text(attributedDisplay)
                 .font(.system(size: theme.bodySize))
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
@@ -142,7 +148,7 @@ struct ItemRow: View {
                 .padding(.vertical, 6)
                 .layoutPriority(1)
         } else {
-            Text(displayText)
+            Text(attributedDisplay)
                 .font(.system(size: theme.bodySize))
                 .lineLimit(1)
                 .truncationMode(.tail)
@@ -168,13 +174,21 @@ struct ItemRow: View {
         }
     }
 
-    /// Open: hover actions + date assign + always-visible X close.
+    /// Open: hover actions + date assign + edit + always-visible X close.
     /// Floats outside the row's bounds, above the top edge.
     private var floatingActionPanel: some View {
         HStack(spacing: 6) {
             HoverActions(actions: actions) { dispatch($0) }
             Divider().frame(height: 14)
             DateAssignButton(item: item)
+            Divider().frame(height: 14)
+            Button(action: edit) {
+                Image(systemName: "pencil")
+                    .font(.system(size: theme.bodySize, weight: .medium))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(.plain)
+            .help("Edit")
             Divider().frame(height: 14)
             Button(action: close) {
                 Image(systemName: "xmark.circle.fill")
@@ -246,7 +260,7 @@ struct ItemRow: View {
     private var dragPreview: some View {
         HStack(spacing: 6) {
             TypeBadge(typeIdentifier: item.typeIdentifier)
-            Text(displayText)
+            Text(attributedDisplay)
                 .font(.system(size: theme.bodySize))
                 .lineLimit(1)
         }
@@ -287,16 +301,55 @@ struct ItemRow: View {
         return "—"
     }
 
-    private func open() {
-        withAnimation(.easeInOut(duration: 0.18)) {
-            panelState.openItem(item.id)
+    /// `displayText` with detected URLs styled as blue underlined links.
+    /// Clicks route through the `openURL` environment, which on macOS
+    /// hands off to the user's default browser via NSWorkspace.
+    private var attributedDisplay: AttributedString {
+        Self.linkify(displayText)
+    }
+
+    private static let linkDetector: NSDataDetector? = {
+        try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
+    }()
+
+    private static func linkify(_ text: String) -> AttributedString {
+        var attr = AttributedString(text)
+        guard !text.isEmpty, let detector = linkDetector else { return attr }
+        let range = NSRange(text.startIndex..<text.endIndex, in: text)
+        for match in detector.matches(in: text, options: [], range: range) {
+            guard let stringRange = Range(match.range, in: text),
+                  let url = match.url,
+                  let lower = AttributedString.Index(stringRange.lowerBound, within: attr),
+                  let upper = AttributedString.Index(stringRange.upperBound, within: attr)
+            else { continue }
+            let attrRange = lower..<upper
+            attr[attrRange].link = url
+            attr[attrRange].foregroundColor = .blue
+            attr[attrRange].underlineStyle = .single
         }
+        return attr
+    }
+
+    // Open/close are intentionally NOT wrapped in `withAnimation`.
+    // The panel window resizes via `NSHostingController`'s
+    // preferredContentSize, which doesn't follow SwiftUI's animation
+    // clock — animating the row's height made the window snap to its
+    // new size while the row was still mid-animation, producing a
+    // visible "jump from center" mismatch. An instant state change
+    // keeps the row and the window in sync.
+    private func open() {
+        panelState.openItem(item.id)
     }
 
     private func close() {
-        withAnimation(.easeInOut(duration: 0.18)) {
-            panelState.closeItem()
-        }
+        panelState.closeItem()
+    }
+
+    /// Move this item's note text into the input bar for editing.
+    /// `beginEdit` stashes any draft already in the bar so it can be
+    /// restored once the user finishes (or cancels) the edit.
+    private func edit() {
+        panelState.beginEdit(itemId: item.id, note: payload.note)
     }
 
     private func dispatch(_ action: RowAction) {
@@ -379,16 +432,6 @@ private extension View {
     ) -> some View {
         if enabled {
             self.draggable(payload, preview: preview)
-        } else {
-            self
-        }
-    }
-
-    /// Applies `.onTapGesture` only when `enabled` is true.
-    @ViewBuilder
-    func tapWhenClosed(_ enabled: Bool, perform: @escaping () -> Void) -> some View {
-        if enabled {
-            self.onTapGesture(perform: perform)
         } else {
             self
         }

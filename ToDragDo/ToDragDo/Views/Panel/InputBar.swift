@@ -20,21 +20,26 @@ struct InputBar: View {
     @Environment(DragSession.self) private var session
 
     private var isDropping: Bool { session.target == .input }
+    private var isEditing: Bool { panelState.editingItemId != nil }
+
+    @FocusState private var isFieldFocused: Bool
 
     var body: some View {
         @Bindable var state = panelState
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 8) {
-                Image(systemName: leadingIcon)
-                    .font(.system(size: theme.bodySize, weight: .medium))
-                    .foregroundStyle(.secondary)
+                leadingControl
                 if isDropping {
                     Color.clear.frame(height: theme.bodySize + 6)
                 } else {
-                    TextField("Type, paste, or drop…", text: $state.inputDraft)
+                    TextField(placeholder, text: $state.inputDraft)
                         .textFieldStyle(.plain)
                         .font(.system(size: theme.bodySize))
+                        .focused($isFieldFocused)
                         .onSubmit { Task { await submit() } }
+                        .onChange(of: panelState.editingItemId) { _, newValue in
+                            if newValue != nil { isFieldFocused = true }
+                        }
                 }
             }
 
@@ -70,12 +75,50 @@ struct InputBar: View {
         )
     }
 
-    private var leadingIcon: String {
-        panelState.pendingAttachments.isEmpty ? "plus" : "paperclip"
+    private var placeholder: String {
+        isEditing ? "Edit and press Return…" : "Type, paste, or drop…"
+    }
+
+    /// Leading slot. Edit mode swaps in a clickable cancel icon; add
+    /// mode shows a static plus/paperclip indicator.
+    @ViewBuilder
+    private var leadingControl: some View {
+        if isEditing {
+            Button(action: { panelState.endEdit() }) {
+                Image(systemName: "xmark.circle.fill")
+                    .font(.system(size: theme.bodySize, weight: .medium))
+                    .foregroundStyle(.orange)
+            }
+            .buttonStyle(.plain)
+            .help("Cancel edit")
+        } else {
+            Image(systemName: panelState.pendingAttachments.isEmpty ? "plus" : "paperclip")
+                .font(.system(size: theme.bodySize, weight: .medium))
+                .foregroundStyle(.secondary)
+        }
     }
 
     private func submit() async {
         let note = panelState.inputDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let editId = panelState.editingItemId {
+            // Editing path: rewrite the existing item's note and restore
+            // whatever draft was sitting in the field beforehand.
+            do {
+                try await repository.update(id: editId) { item in
+                    var payload = ItemPayload.decode(item.payload)
+                    payload.note = note
+                    if let data = try? payload.encoded() {
+                        item.payload = data
+                    }
+                }
+            } catch {
+                print("InputBar edit failed: \(error)")
+            }
+            panelState.endEdit()
+            return
+        }
+
         let attachments = panelState.pendingAttachments
         guard !note.isEmpty || !attachments.isEmpty else { return }
         do {

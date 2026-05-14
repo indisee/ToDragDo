@@ -101,7 +101,20 @@ struct PanelView: View {
     let storage = try! StorageFactory.makeItemStorage(inMemory: true)
     let repo = Repository(storage: storage, deviceId: "preview")
     let settings = AppSettings()
-    let controller = PanelController(repository: repo, settings: settings)
+    let coordinator = SyncCoordinator(applier: repo)
+    let watcher = CloudKitAccountWatcher(
+        containerIdentifier: "iCloud.preview",
+        coordinator: coordinator,
+        settings: settings
+    )
+    let controller = PanelController(
+        repository: repo,
+        settings: settings,
+        coordinator: coordinator,
+        accountWatcher: watcher,
+        storageHealth: StorageHealth(),
+        dataLocation: DataLocation()
+    )
     return PanelView()
         .environment(settings)
         .environment(repo)

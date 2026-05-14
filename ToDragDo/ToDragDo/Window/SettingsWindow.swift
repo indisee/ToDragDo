@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ToDragDoCore
 
 /// On-demand `NSWindow` for Settings.
 ///
@@ -12,16 +13,42 @@ import SwiftUI
 final class SettingsWindow {
     private var window: NSWindow?
     private let settings: AppSettings
+    private let coordinator: SyncCoordinator
+    private let accountWatcher: CloudKitAccountWatcher
+    private let storageHealth: StorageHealth
+    private let dataLocation: DataLocation
 
-    init(settings: AppSettings) {
+    init(
+        settings: AppSettings,
+        coordinator: SyncCoordinator,
+        accountWatcher: CloudKitAccountWatcher,
+        storageHealth: StorageHealth,
+        dataLocation: DataLocation
+    ) {
         self.settings = settings
+        self.coordinator = coordinator
+        self.accountWatcher = accountWatcher
+        self.storageHealth = storageHealth
+        self.dataLocation = dataLocation
     }
 
     func show() {
         if window == nil {
             let host = NSHostingController(
-                rootView: AnyView(SettingsView().environment(settings))
+                rootView: AnyView(
+                    SettingsView()
+                        .environment(settings)
+                        .environment(coordinator)
+                        .environment(accountWatcher)
+                        .environment(storageHealth)
+                        .environment(dataLocation)
+                )
             )
+            // Track the SwiftUI tree's preferred content size so the
+            // window resizes when the active tab changes. Without this
+            // the TabView grows to fit the largest tab on first open
+            // and never shrinks back when a smaller tab is selected.
+            host.sizingOptions = [.preferredContentSize]
             let window = NSWindow(contentViewController: host)
             window.title = "ToDragDo Settings"
             window.styleMask = [.titled, .closable]

@@ -14,7 +14,14 @@ final class PanelController {
     private(set) var isVisible: Bool
     private var keyMonitor: Any?
 
-    init(repository: Repository, settings: AppSettings) {
+    init(
+        repository: Repository,
+        settings: AppSettings,
+        coordinator: SyncCoordinator,
+        accountWatcher: CloudKitAccountWatcher,
+        storageHealth: StorageHealth,
+        dataLocation: DataLocation
+    ) {
         let panel = FloatingPanel(
             contentRect: NSRect(x: 0, y: 0, width: 420, height: 200),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -43,7 +50,13 @@ final class PanelController {
         panel.center()
 
         self.panel = panel
-        self.settingsWindow = SettingsWindow(settings: settings)
+        self.settingsWindow = SettingsWindow(
+            settings: settings,
+            coordinator: coordinator,
+            accountWatcher: accountWatcher,
+            storageHealth: storageHealth,
+            dataLocation: dataLocation
+        )
         self.isVisible = false
 
         // Wire the SwiftUI host after `self` is fully initialized so the

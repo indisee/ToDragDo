@@ -36,6 +36,21 @@ public protocol ItemStorage: Sendable {
 
     /// Reads the sync status for one (change × provider) pair, if any exists.
     func syncStatus(forChange changeId: UUID, providerId: String) async throws -> ChangeSyncStatus?
+
+    // MARK: - Remote apply (no outbox row)
+
+    /// Apply a remotely-originated insert/update without appending an outbox
+    /// row. Implementations resolve concurrent edits last-write-wins on
+    /// `updatedAt`: if the existing row's `updatedAt >= item.updatedAt`,
+    /// the incoming write is dropped.
+    func upsertWithoutChange(_ item: Item) async throws
+
+    /// Remote-originated soft delete; no outbox row. LWW on `updatedAt`: if
+    /// the local row has a newer `updatedAt`, drop.
+    func softDeleteWithoutChange(id: UUID, at deletedAt: Date) async throws
+
+    /// Remote-originated hard delete; no outbox row. Always wins.
+    func hardDeleteWithoutChange(id: UUID) async throws
 }
 
 public enum StorageError: Error, Sendable, Equatable {
