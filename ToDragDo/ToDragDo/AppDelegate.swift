@@ -16,8 +16,16 @@ import AppKit
 ///    `SettingsWindow`) already set this at creation; the observer
 ///    below is a safety net for any window AppKit creates on our behalf
 ///    (alerts, save panels, color pickers, etc.).
+/// 5. Install the menu-bar `NSStatusItem`. This MUST happen here, not
+///    in `ToDragDoApp.init`: SwiftUI's scene runtime wraps any
+///    `NSStatusBar.system.statusItem(...)` call made during App init
+///    as a private `NSSceneStatusItem` that silently ignores
+///    `statusItem.menu = …` and `button.action`. By
+///    `applicationDidFinishLaunching` the scene runtime is done
+///    bootstrapping, so we get a real `NSStatusItem`.
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var windowObserver: NSObjectProtocol?
+    private var menuBar: MenuBarStatusItem?
 
     func applicationWillFinishLaunching(_ notification: Notification) {
         UserDefaults.standard.set(false, forKey: "NSQuitAlwaysKeepsWindows")
@@ -37,6 +45,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             MainActor.assumeIsolated {
                 (notification.object as? NSWindow)?.sharingType = Self.currentSharingType
             }
+        }
+        if let panelController = PanelController.shared {
+            menuBar = MenuBarStatusItem(panelController: panelController)
         }
     }
 

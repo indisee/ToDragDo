@@ -9,7 +9,6 @@ struct ToDragDoApp: App {
     @State private var settings: AppSettings
     @State private var panelController: PanelController
     @State private var dayRollover: DayRollover
-    @State private var menuBar: MenuBarStatusItem
     @State private var coordinator: SyncCoordinator
     @State private var accountWatcher: CloudKitAccountWatcher
     @State private var syncTicker: SyncTicker
@@ -47,9 +46,9 @@ struct ToDragDoApp: App {
             storageHealth: health,
             dataLocation: dataLocation
         )
+        PanelController.shared = panelController
         let dayRollover = DayRollover(repository: repository)
         dayRollover.start()
-        let menuBar = MenuBarStatusItem(panelController: panelController)
         let syncTicker = SyncTicker(
             coordinator: coordinator,
             repository: repository,
@@ -74,7 +73,6 @@ struct ToDragDoApp: App {
         _settings = State(initialValue: settings)
         _panelController = State(initialValue: panelController)
         _dayRollover = State(initialValue: dayRollover)
-        _menuBar = State(initialValue: menuBar)
         _coordinator = State(initialValue: coordinator)
         _accountWatcher = State(initialValue: accountWatcher)
         _syncTicker = State(initialValue: syncTicker)
@@ -111,15 +109,15 @@ struct ToDragDoApp: App {
     }
 
     var body: some Scene {
-        // The actual menu bar icon is the `NSStatusItem` owned by
-        // `MenuBarStatusItem`. SwiftUI requires at least one Scene; this
-        // hidden `MenuBarExtra` (`isInserted: false`) satisfies that
-        // without registering a duplicate icon.
-        MenuBarExtra(
-            "ToDragDo",
-            systemImage: "checklist",
-            isInserted: .constant(false)
-        ) {
+        // The status bar icon is owned by `MenuBarStatusItem`. SwiftUI
+        // requires at least one Scene; `Settings` is inert here because
+        // `.accessory` apps have no app menu to invoke it from, and the
+        // close-loop in AppDelegate dismisses it if macOS auto-restores
+        // it. Unlike `MenuBarExtra`, `Settings` doesn't hook
+        // `NSStatusBar.system`, so the manual `NSStatusItem` stays a
+        // real `NSStatusItem` instead of being wrapped as
+        // `NSSceneStatusItem` (which silently drops clicks).
+        Settings {
             EmptyView()
         }
     }

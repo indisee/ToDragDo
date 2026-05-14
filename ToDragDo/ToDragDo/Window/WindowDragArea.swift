@@ -17,6 +17,12 @@ private final class DragNSView: NSView {
 
     override var mouseDownCanMoveWindow: Bool { true }
 
+    /// The panel is non-activating, so when it's not key, AppKit would
+    /// otherwise swallow the first click as a focus-grab and never
+    /// deliver mouseDown here. Accepting first mouse lets the user
+    /// pick up and move the window in a single gesture.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     override func resetCursorRects() {
         addCursorRect(bounds, cursor: .openHand)
     }
@@ -90,11 +96,18 @@ private final class ResizeNSView: NSView {
     private var anchorX: CGFloat?
     private var startWidth: CGFloat?
 
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
     override func resetCursorRects() {
         addCursorRect(bounds, cursor: .resizeLeftRight)
     }
 
     override func mouseDown(with event: NSEvent) {
+        // Selectable Text inside the expanded row becomes first responder
+        // on click. SwiftUI mis-lays it out when the parent width changes
+        // while it's active — the text renders as empty until the row is
+        // re-opened. Dropping focus before the drag avoids the bad path.
+        window?.makeFirstResponder(nil)
         anchorX = NSEvent.mouseLocation.x
         startWidth = currentWidth?() ?? window?.frame.size.width
     }

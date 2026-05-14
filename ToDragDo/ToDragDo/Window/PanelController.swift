@@ -9,6 +9,11 @@ import ToDragDoCore
 /// its content area to match. Width is fixed at 420pt in `PanelView`.
 @MainActor @Observable
 final class PanelController {
+    /// Set in `ToDragDoApp.init` so AppKit-scope code (the AppDelegate,
+    /// which creates the manual `NSStatusItem`) can drive the panel
+    /// without a direct dependency wire-up.
+    static weak var shared: PanelController?
+
     private let panel: NSPanel
     private let settingsWindow: SettingsWindow
     private(set) var isVisible: Bool
