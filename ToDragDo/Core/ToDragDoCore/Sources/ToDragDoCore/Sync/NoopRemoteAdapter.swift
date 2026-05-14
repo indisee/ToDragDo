@@ -9,7 +9,9 @@ public struct NoopRemoteAdapter: RemoteAdapter {
         self.displayName = displayName
     }
 
-    public func push(_ changes: [ChangeRecord]) async throws {}
+    public func push(_ changes: [ChangeRecord]) async throws -> PushOutcome {
+        .allSucceeded(changes.map(\.id))
+    }
 
     public func pull(since cursor: SyncCursor) async throws -> (changes: [ChangeRecord], next: SyncCursor) {
         ([], cursor)

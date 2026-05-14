@@ -12,6 +12,7 @@ import ToDragDoCore
 final class SyncTicker {
     private let coordinator: SyncCoordinator
     private let repository: Repository
+    private let accountWatcher: CloudKitAccountWatcher?
     private let interval: TimeInterval
     private let log = Logger(subsystem: "com.turtle.todragdo", category: "SyncTicker")
     private var task: Task<Void, Never>?
@@ -21,10 +22,12 @@ final class SyncTicker {
     init(
         coordinator: SyncCoordinator,
         repository: Repository,
+        accountWatcher: CloudKitAccountWatcher? = nil,
         interval: TimeInterval = 20
     ) {
         self.coordinator = coordinator
         self.repository = repository
+        self.accountWatcher = accountWatcher
         self.interval = interval
     }
 
@@ -33,6 +36,13 @@ final class SyncTicker {
         task = Task { @MainActor [weak self] in
             guard let self else { return }
             try? await self.repository.reload()
+            // Wait for the iCloud account check to settle before the first
+            // sync — otherwise the initial syncAll() runs with enabled=false
+            // (the default) and the user sees "failed" / no progress until
+            // the next tick fires 20 s later.
+            if let accountWatcher = self.accountWatcher {
+                _ = await accountWatcher.refresh()
+            }
             self.log.info("Initial sync starting")
             await self.coordinator.syncAll()
             while !Task.isCancelled {

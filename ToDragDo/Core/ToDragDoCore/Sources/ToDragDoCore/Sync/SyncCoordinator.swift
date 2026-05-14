@@ -68,7 +68,11 @@ public final class SyncCoordinator {
 
         updateStatus(providerId: providerId) { $0.lastAttempt = .now }
 
-        var cycleError: (any Error)?
+        // Track pull and push errors separately so we report both when both
+        // fail — the previous code overwrote the pull error with the push
+        // error and silently lost half the diagnostic context.
+        var pullError: (any Error)?
+        var pushError: (any Error)?
 
         // Pull
         let cursor = cursors[providerId] ?? .initial
@@ -78,7 +82,7 @@ public final class SyncCoordinator {
             cursors[providerId] = next
             saveCursor(next, providerId: providerId)
         } catch {
-            cycleError = error
+            pullError = error
         }
 
         // Push — attempt regardless of pull outcome so a transient pull
@@ -88,31 +92,69 @@ public final class SyncCoordinator {
             if !pending.isEmpty {
                 let ids = pending.map(\.id)
                 do {
-                    try await adapter.push(pending)
-                    try await applier.markPushed(ids, to: providerId)
+                    let outcome = try await adapter.push(pending)
+                    if !outcome.succeeded.isEmpty {
+                        try await applier.markPushed(outcome.succeeded, to: providerId)
+                    }
+                    // Group failures by error string so we issue one
+                    // recordPushFailure per distinct error rather than one
+                    // per record. Reduces storage churn when CloudKit
+                    // rejects a whole batch with the same reason.
+                    if !outcome.failed.isEmpty {
+                        let byError = Dictionary(grouping: outcome.failed, by: \.error)
+                        for (errorString, group) in byError {
+                            try? await applier.recordPushFailure(
+                                group.map(\.id),
+                                to: providerId,
+                                error: errorString
+                            )
+                        }
+                        pushError = PushFailedError(failures: outcome.failed)
+                    }
                 } catch {
                     try? await applier.recordPushFailure(
                         ids,
                         to: providerId,
-                        error: error.localizedDescription
+                        error: descriptionFor(error)
                     )
-                    cycleError = error
+                    pushError = error
                 }
             }
         } catch {
-            cycleError = error
+            pushError = error
         }
 
         let count = (try? await applier.pendingPushCount(for: providerId)) ?? 0
         updateStatus(providerId: providerId) { s in
             s.pendingPushCount = count
-            if let err = cycleError {
-                s.lastError = err.localizedDescription
-            } else {
+            switch (pullError, pushError) {
+            case (nil, nil):
                 s.lastSuccess = .now
                 s.lastError = nil
+            case (let p?, nil):
+                s.lastError = "Pull: " + descriptionFor(p)
+            case (nil, let p?):
+                s.lastError = "Push: " + descriptionFor(p)
+            case (let pull?, let push?):
+                s.lastError = """
+                Pull: \(descriptionFor(pull))
+
+                Push: \(descriptionFor(push))
+                """
             }
         }
+    }
+
+    /// Prefer `LocalizedError.errorDescription` (which our CloudKit
+    /// wrapper populates with the full multi-line CKError chain) over
+    /// `localizedDescription` (which CloudKit collapses to a generic
+    /// string like "Failed to send changes").
+    private func descriptionFor(_ error: any Error) -> String {
+        if let localized = error as? any LocalizedError,
+           let description = localized.errorDescription, !description.isEmpty {
+            return description
+        }
+        return error.localizedDescription
     }
 
     private func refreshPendingCount(providerId: String) async {
@@ -146,5 +188,42 @@ public final class SyncCoordinator {
 
     private func cursorKey(_ providerId: String) -> String {
         "todragdo.sync.cursor.\(providerId)"
+    }
+}
+
+/// Error surfaced via `SyncStatus.lastError` when one or more records in a
+/// push batch failed but others may have succeeded. Distinct from a thrown
+/// batch-level error so the UI can render "N of M failed" later.
+public struct PushFailedError: Error, LocalizedError {
+    public let failures: [PushOutcome.Failure]
+
+    public var errorDescription: String? {
+        // Preserve order of first occurrence while collapsing duplicates.
+        // CloudKit typically rejects every record in a batch with the same
+        // root cause; rendering it once with a record count keeps the UI
+        // readable without truncating the underlying reason.
+        var seen = Set<String>()
+        var unique: [(reason: String, count: Int)] = []
+        for failure in failures {
+            if seen.insert(failure.error).inserted {
+                unique.append((failure.error, 1))
+            } else if let idx = unique.firstIndex(where: { $0.reason == failure.error }) {
+                unique[idx].count += 1
+            }
+        }
+
+        if unique.count == 1 {
+            let entry = unique[0]
+            if entry.count == 1 {
+                return entry.reason
+            }
+            return "\(entry.count) records failed with:\n\(entry.reason)"
+        }
+
+        var blocks: [String] = ["\(failures.count) records failed (\(unique.count) distinct reasons):"]
+        for entry in unique {
+            blocks.append("— \(entry.count)× —\n\(entry.reason)")
+        }
+        return blocks.joined(separator: "\n\n")
     }
 }

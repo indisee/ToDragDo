@@ -103,6 +103,45 @@ struct SyncCoordinatorTests {
         #expect(failed?.lastError != nil)
     }
 
+    @Test("partial push outcome marks succeeded ids pushed and leaves failed ids pending")
+    func syncHandlesPartialPushOutcome() async throws {
+        let adapter = FakeAdapter(providerId: Self.provider, displayName: "Fake")
+        let (coordinator, repo, _) = makeSUT(adapter: adapter)
+
+        _ = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data())
+        _ = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data())
+
+        // Pre-fetch the pending change IDs so we can target one for failure.
+        let pendingBefore = try await repo.pendingChanges(for: Self.provider)
+        try #require(pendingBefore.count == 2)
+        let goodId = pendingBefore[0].id
+        let badId = pendingBefore[1].id
+
+        await adapter.setPushOutcome(PushOutcome(
+            succeeded: [goodId],
+            failed: [PushOutcome.Failure(id: badId, error: "schema mismatch")]
+        ))
+
+        await coordinator.sync(Self.provider)
+
+        // Only the failed record remains in the outbox.
+        let remaining = try await repo.pendingChanges(for: Self.provider)
+        #expect(remaining.count == 1)
+        #expect(remaining.first?.id == badId)
+
+        let status = coordinator.statuses[0]
+        #expect(status.lastError != nil)
+        #expect(status.pendingPushCount == 1)
+
+        let failed = try await repo.syncStatus(forChange: badId, providerId: Self.provider)
+        #expect(failed?.attemptCount == 1)
+        #expect(failed?.lastError == "schema mismatch")
+
+        // Succeeded record has no leftover pending row.
+        let goodStatus = try await repo.syncStatus(forChange: goodId, providerId: Self.provider)
+        #expect(goodStatus?.pushedAt != nil)
+    }
+
     @Test("pull applies remote ChangeRecords to local storage")
     func pullAppliesRemoteChanges() async throws {
         let adapter = FakeAdapter(providerId: Self.provider, displayName: "Fake")
@@ -193,6 +232,7 @@ private actor FakeAdapter: RemoteAdapter {
     private(set) var lastPulledCursor: SyncCursor = .initial
 
     private var pushError: (any Error)?
+    private var pushPartialOutcome: PushOutcome?
     private var queuedPull: (changes: [ChangeRecord], next: SyncCursor) = ([], .initial)
 
     init(providerId: String, displayName: String) {
@@ -204,14 +244,25 @@ private actor FakeAdapter: RemoteAdapter {
         self.pushError = error
     }
 
+    /// When set, the next `push` returns this outcome verbatim instead of
+    /// the default "everything succeeded" result.
+    func setPushOutcome(_ outcome: PushOutcome?) {
+        self.pushPartialOutcome = outcome
+    }
+
     func queuePull(records: [ChangeRecord], next: SyncCursor) {
         self.queuedPull = (records, next)
     }
 
-    func push(_ changes: [ChangeRecord]) async throws {
+    func push(_ changes: [ChangeRecord]) async throws -> PushOutcome {
         pushCallCount += 1
         lastPushedIds = changes.map(\.id)
         if let pushError { throw pushError }
+        if let pushPartialOutcome {
+            self.pushPartialOutcome = nil
+            return pushPartialOutcome
+        }
+        return .allSucceeded(changes.map(\.id))
     }
 
     func pull(since cursor: SyncCursor) async throws -> (changes: [ChangeRecord], next: SyncCursor) {

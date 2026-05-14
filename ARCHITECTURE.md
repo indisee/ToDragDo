@@ -240,11 +240,26 @@ public protocol RemoteAdapter: Sendable {
     var providerId: String { get }      // stable, e.g. "icloud"
     var displayName: String { get }     // user-facing, e.g. "iCloud"
 
-    func push(_ changes: [ChangeRecord]) async throws
+    func push(_ changes: [ChangeRecord]) async throws -> PushOutcome
     func pull(since cursor: SyncCursor) async throws
         -> (changes: [ChangeRecord], next: SyncCursor)
 }
+
+public struct PushOutcome: Sendable {
+    public let succeeded: [UUID]
+    public let failed: [Failure]
+    public struct Failure: Sendable { let id: UUID; let error: String }
+}
 ```
+
+`push` returns a per-record outcome rather than throwing on partial
+failure. The coordinator marks `succeeded` IDs pushed and calls
+`recordPushFailure` for the rest — so a single bad record (schema
+mismatch, conflict) doesn't poison the whole batch and, crucially,
+records that CloudKit rejected don't get silently marked as pushed.
+Throwing is reserved for batch-level errors (network, auth) where no
+per-record breakdown exists; the coordinator then treats every ID in
+the batch as failed.
 
 ### Per-change × per-provider push state
 
@@ -328,6 +343,23 @@ re-enabling resumes from where it stopped.
   `snapshot` payload is a `CKAsset` for any non-trivial size.
 - Pull cursor uses `CKSyncEngine`'s server-state token, persisted via
   `SyncCursor.token`.
+- Tracks per-record success/failure during `sendChanges()` via the
+  `.sentRecordZoneChanges` delegate event: `savedRecords` go into
+  `cycleSucceeded`, `failedRecordSaves` go into `cycleFailed`. The
+  `push` method composes those into a `PushOutcome` for the
+  coordinator. CloudKit conflicts (`CKError.serverRecordChanged`) are
+  treated as success because our zone is append-only — the record
+  exists on the server already with our content.
+- `CKAsset` files live in the app's Application Support directory
+  (`CloudKitAssets/<change-id>.json`), **not** `/tmp`. CloudKit
+  uploads assets asynchronously after the record is staged; the OS
+  sweeps `/tmp` on its own schedule, which used to cause every push
+  retry to fail permanently. Files are deleted after CloudKit
+  confirms the save (or on conflict resolution).
+- First-launch sequencing: `SyncTicker.start()` awaits
+  `CloudKitAccountWatcher.refresh()` before its first `syncAll()`,
+  so the initial sync doesn't no-op on the `enabled=false` default
+  while the async account check is still in flight.
 
 Per-provider auth state for non-Apple backends lives in `AuthStore`
 (Keychain-backed) — same pattern as content-provider auth.

@@ -22,6 +22,14 @@ struct SyncSettingsView: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text("Providers")
                     .font(.headline)
+                HStack(spacing: 6) {
+                    Text("iCloud environment:")
+                        .foregroundStyle(.secondary)
+                    Text(CloudKitEnvironmentProbe.summary)
+                        .font(.system(.caption, design: .monospaced))
+                        .textSelection(.enabled)
+                }
+                .font(.caption)
                 if coordinator.statuses.isEmpty {
                     Text("No sync providers configured.")
                         .foregroundStyle(.secondary)
@@ -128,9 +136,26 @@ private struct ProviderRow: View {
             }
 
             if let error = status.lastError {
-                Label(error, systemImage: "exclamationmark.triangle")
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .top, spacing: 6) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundStyle(.red)
+                        Text(error)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.red)
+                            .textSelection(.enabled)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    Button("Copy Error") {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(error, forType: .string)
+                    }
+                    .controlSize(.small)
+                    .buttonStyle(.borderless)
+                }
+                .padding(8)
+                .background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
             }
         }
         .padding(.vertical, 4)

@@ -50,7 +50,11 @@ struct ToDragDoApp: App {
         let dayRollover = DayRollover(repository: repository)
         dayRollover.start()
         let menuBar = MenuBarStatusItem(panelController: panelController)
-        let syncTicker = SyncTicker(coordinator: coordinator, repository: repository)
+        let syncTicker = SyncTicker(
+            coordinator: coordinator,
+            repository: repository,
+            accountWatcher: accountWatcher
+        )
         syncTicker.start()
 
         // After every local write: refresh the pending-push count so the

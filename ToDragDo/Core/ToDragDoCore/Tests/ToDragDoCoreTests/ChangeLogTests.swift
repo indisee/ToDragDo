@@ -143,7 +143,7 @@ struct ChangeLogTests {
         )
         #expect(adapter.providerId == "icloud")
         #expect(adapter.displayName == "iCloud")
-        try await adapter.push([])
+        _ = try await adapter.push([])
         let (changes, next) = try await adapter.pull(since: .initial)
         #expect(changes.isEmpty)
         #expect(next == .initial)

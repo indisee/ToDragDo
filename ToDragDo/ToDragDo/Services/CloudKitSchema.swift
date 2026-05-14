@@ -26,7 +26,15 @@ enum CloudKitSchema {
         CKRecordZone.ID(zoneName: zoneName, ownerName: CKCurrentUserDefaultName)
     }
 
-    nonisolated static func makeRecord(from change: ChangeRecord) throws -> CKRecord {
+    /// `assetDirectory` should be a stable on-disk location (e.g. inside
+    /// the app's Application Support container) — `CKAsset` uploads happen
+    /// asynchronously after the record is staged, so a file in `/tmp` may
+    /// be swept by the OS before CloudKit reads it, causing every save to
+    /// fail permanently. Caller is responsible for creating the directory.
+    nonisolated static func makeRecord(
+        from change: ChangeRecord,
+        assetDirectory: URL
+    ) throws -> CKRecord {
         let recordID = CKRecord.ID(
             recordName: change.id.uuidString,
             zoneID: recordZoneID
@@ -38,10 +46,7 @@ enum CloudKitSchema {
         record[Field.ts] = change.ts
         record[Field.deviceId] = change.deviceId
 
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("todragdo-ck-assets", isDirectory: true)
-        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let url = dir.appendingPathComponent("\(change.id.uuidString).json")
+        let url = assetDirectory.appendingPathComponent("\(change.id.uuidString).json")
         try change.snapshot.write(to: url, options: .atomic)
         record[Field.snapshot] = CKAsset(fileURL: url)
         return record
