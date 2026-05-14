@@ -133,6 +133,11 @@ public final class SwiftDataStorage: ItemStorage {
         }
     }
 
+    public func allItems() async throws -> [Item] {
+        let descriptor = FetchDescriptor<PersistedItem>()
+        return try ctx.fetch(descriptor).map { $0.toDTO() }
+    }
+
     public func purgeTrash(before: Date, changes: [ChangeRecord]) async throws {
         try ctx.transaction {
             let descriptor = FetchDescriptor<PersistedItem>(
@@ -223,6 +228,15 @@ public final class SwiftDataStorage: ItemStorage {
     public func syncStatus(forChange changeId: UUID, providerId: String) async throws -> ChangeSyncStatus? {
         guard let change = try fetchChange(id: changeId) else { return nil }
         return change.status(for: providerId)?.toDTO()
+    }
+
+    public func appendChanges(_ changes: [ChangeRecord]) async throws {
+        guard !changes.isEmpty else { return }
+        try ctx.transaction {
+            for change in changes {
+                ctx.insert(PersistedChange(from: change))
+            }
+        }
     }
 
     // MARK: - Remote apply (no outbox row)

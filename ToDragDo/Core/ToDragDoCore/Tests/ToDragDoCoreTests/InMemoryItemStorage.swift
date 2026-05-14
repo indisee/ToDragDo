@@ -49,6 +49,10 @@ actor InMemoryItemStorage: ItemStorage {
         changes[change.id] = change
     }
 
+    func allItems() async throws -> [Item] {
+        Array(items.values)
+    }
+
     func purgeTrash(before: Date, changes incoming: [ChangeRecord]) async throws {
         let toRemove = items.values
             .filter { ($0.deletedAt ?? .distantFuture) < before }
@@ -99,6 +103,12 @@ actor InMemoryItemStorage: ItemStorage {
 
     func syncStatus(forChange changeId: UUID, providerId: String) async throws -> ChangeSyncStatus? {
         statuses[changeId]?[providerId]
+    }
+
+    func appendChanges(_ incoming: [ChangeRecord]) async throws {
+        for change in incoming {
+            changes[change.id] = change
+        }
     }
 
     // MARK: - Remote apply (no outbox row)

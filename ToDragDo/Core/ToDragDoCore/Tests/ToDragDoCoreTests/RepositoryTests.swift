@@ -197,6 +197,53 @@ struct RepositoryTests {
         #expect(order == [b.id, a.id])
     }
 
+    @Test("resyncAllItems appends a fresh outbox row per item, marked pending for the provider")
+    func resyncAllItemsAppendsPendingRows() async throws {
+        let (repo, storage) = makeSUT()
+
+        let live = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data("a".utf8))
+        let alsoLive = try await repo.add(folder: .libmo, typeIdentifier: "t", payload: Data("b".utf8))
+        let toDelete = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data("c".utf8))
+        try await repo.softDelete(id: toDelete.id)
+
+        // Simulate that the existing outbox is fully pushed to the
+        // provider — this is the state right after switching env, where
+        // pre-existing changes are marked pushed but the new environment
+        // is empty.
+        let pendingBefore = try await repo.pendingChanges(for: Self.provider)
+        try await repo.markPushed(pendingBefore.map(\.id), to: Self.provider)
+        #expect(try await repo.pendingPushCount(for: Self.provider) == 0)
+
+        let count = try await repo.resyncAllItems()
+        #expect(count == 3)
+
+        let pending = try await repo.pendingChanges(for: Self.provider)
+        #expect(pending.count == 3)
+
+        let opsByEntity = Dictionary(uniqueKeysWithValues: pending.map { ($0.entityId, $0.op) })
+        #expect(opsByEntity[live.id] == .update)
+        #expect(opsByEntity[alsoLive.id] == .update)
+        #expect(opsByEntity[toDelete.id] == .softDelete)
+
+        // Each snapshot decodes back to a current-state Item with the
+        // right id and (for the deleted one) deletedAt populated.
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        for change in pending {
+            let decoded = try decoder.decode(Item.self, from: change.snapshot)
+            #expect(decoded.id == change.entityId)
+            if change.entityId == toDelete.id {
+                #expect(decoded.deletedAt != nil)
+            } else {
+                #expect(decoded.deletedAt == nil)
+            }
+        }
+
+        // The local item table is unchanged — resync only touches the outbox.
+        let storageCount = await storage.itemCount()
+        #expect(storageCount == 3)
+    }
+
     @Test("ChangeRecord snapshot decodes back to the saved Item")
     func snapshotRoundTrips() async throws {
         let (repo, _) = makeSUT()

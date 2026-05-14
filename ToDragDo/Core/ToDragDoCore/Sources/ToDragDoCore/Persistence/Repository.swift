@@ -405,6 +405,38 @@ public final class Repository: RemoteApplier {
         }
     }
 
+    /// Append a fresh current-state outbox row for every local item
+    /// (including soft-deleted ones). Used after switching CloudKit
+    /// environments — the new destination is empty, but the existing
+    /// outbox rows are marked pushed against the old environment under
+    /// the same provider id, so they will not re-emit on their own.
+    ///
+    /// Soft-deleted items emit a `.softDelete` change; live items emit
+    /// `.update`. The local items are not mutated. Returns the number of
+    /// outbox rows appended. After calling, the host should trigger a
+    /// sync cycle.
+    @discardableResult
+    public func resyncAllItems() async throws -> Int {
+        let allItems = try await storage.allItems()
+        guard !allItems.isEmpty else { return 0 }
+        let now = Date()
+        let changes: [ChangeRecord] = allItems.map { item in
+            let op: ChangeOp = item.deletedAt != nil ? .softDelete : .update
+            let snapshot = (try? encoder.encode(item)) ?? Data()
+            return ChangeRecord(
+                entityType: "Item",
+                entityId: item.id,
+                op: op,
+                snapshot: snapshot,
+                deviceId: deviceId,
+                ts: now
+            )
+        }
+        try await storage.appendChanges(changes)
+        onWriteCallback?()
+        return changes.count
+    }
+
     private func makeChange(op: ChangeOp, item: Item) -> ChangeRecord {
         let snapshot = (try? encoder.encode(item)) ?? Data()
         return ChangeRecord(

@@ -17,6 +17,11 @@ public protocol ItemStorage: Sendable {
     /// Hard-deletes soft-deleted items whose `deletedAt < before`.
     func purgeTrash(before: Date, changes: [ChangeRecord]) async throws
 
+    /// Every item in the store including soft-deleted ones. Backs the
+    /// "Re-sync everything to iCloud" path, where the caller needs the
+    /// current state of every row to emit fresh outbox entries.
+    func allItems() async throws -> [Item]
+
     // MARK: - Outbox (per-provider)
 
     /// Returns ChangeRecords that have not yet been successfully pushed to `providerId`.
@@ -36,6 +41,12 @@ public protocol ItemStorage: Sendable {
 
     /// Reads the sync status for one (change × provider) pair, if any exists.
     func syncStatus(forChange changeId: UUID, providerId: String) async throws -> ChangeSyncStatus?
+
+    /// Append outbox change rows without touching the item table. Used by
+    /// the "Re-sync everything" path to enqueue current-state snapshots
+    /// after switching CloudKit environments — the items themselves
+    /// haven't changed, only their pushed-to-provider state needs to.
+    func appendChanges(_ changes: [ChangeRecord]) async throws
 
     // MARK: - Remote apply (no outbox row)
 

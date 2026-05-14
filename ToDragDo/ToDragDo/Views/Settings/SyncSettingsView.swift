@@ -5,10 +5,15 @@ import ToDragDoCore
 /// iCloud. Users toggle the provider on/off, force a manual sync, and see
 /// the most recent attempt/success/error and pending push count.
 struct SyncSettingsView: View {
+    @Environment(Repository.self) private var repository
     @Environment(SyncCoordinator.self) private var coordinator
     @Environment(AppSettings.self) private var settings
     @Environment(CloudKitAccountWatcher.self) private var accountWatcher
     @Environment(StorageHealth.self) private var storageHealth
+
+    @State private var resyncTarget: SyncStatus?
+    @State private var resyncInFlight = false
+    @State private var resyncSummary: String?
 
     var body: some View {
         // Plain VStack (not Form/.grouped) so the pane sizes to its actual
@@ -40,11 +45,15 @@ struct SyncSettingsView: View {
                             if idx > 0 { Divider() }
                             ProviderRow(
                                 status: status,
+                                resyncInFlight: resyncInFlight && resyncTarget?.providerId == status.providerId,
                                 onToggle: { newValue in
                                     Task { await handleToggle(status: status, newValue: newValue) }
                                 },
                                 onSyncNow: {
                                     Task { await coordinator.sync(status.providerId) }
+                                },
+                                onResyncAll: {
+                                    resyncTarget = status
                                 }
                             )
                         }
@@ -57,6 +66,59 @@ struct SyncSettingsView: View {
         }
         .padding(20)
         .frame(width: 480)
+        .confirmationDialog(
+            "Re-sync everything to \(resyncTarget?.displayName ?? "iCloud")?",
+            isPresented: Binding(
+                get: { resyncTarget != nil && !resyncInFlight },
+                set: { if !$0 { resyncTarget = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: resyncTarget
+        ) { target in
+            Button("Re-upload every item", role: .destructive) {
+                Task { await runResync(for: target) }
+            }
+            Button("Cancel", role: .cancel) {
+                resyncTarget = nil
+            }
+        } message: { target in
+            Text("""
+            Appends a fresh current-state outbox row for every local item — including soft-deleted ones — so the next sync pushes them all to \(target.displayName) again.
+
+            Use this after switching CloudKit environments (Dev → Prod) or to recover from a sync that silently lost data. Existing already-pushed history is untouched; this just adds new pending rows.
+            """)
+        }
+        .alert(
+            "Re-sync queued",
+            isPresented: Binding(
+                get: { resyncSummary != nil },
+                set: { if !$0 { resyncSummary = nil } }
+            ),
+            presenting: resyncSummary
+        ) { _ in
+            Button("OK") { resyncSummary = nil }
+        } message: { summary in
+            Text(summary)
+        }
+    }
+
+    private func runResync(for status: SyncStatus) async {
+        resyncInFlight = true
+        defer {
+            resyncInFlight = false
+            resyncTarget = nil
+        }
+        do {
+            let count = try await repository.resyncAllItems()
+            if count == 0 {
+                resyncSummary = "No local items to re-sync."
+            } else {
+                await coordinator.sync(status.providerId)
+                resyncSummary = "Queued \(count) item\(count == 1 ? "" : "s") for re-push to \(status.displayName). Watch the Pending counter."
+            }
+        } catch {
+            resyncSummary = "Re-sync failed: \(error.localizedDescription)"
+        }
     }
 
     private func handleToggle(status: SyncStatus, newValue: Bool) async {
@@ -108,8 +170,10 @@ private struct StorageNoticeBanner: View {
 
 private struct ProviderRow: View {
     let status: SyncStatus
+    let resyncInFlight: Bool
     let onToggle: (Bool) -> Void
     let onSyncNow: () -> Void
+    let onResyncAll: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -131,8 +195,14 @@ private struct ProviderRow: View {
                 metric("Last sync", value: relative(status.lastSuccess))
                 metric("Pending", value: "\(status.pendingPushCount)")
                 Spacer()
+                if resyncInFlight {
+                    ProgressView()
+                        .controlSize(.small)
+                }
+                Button("Re-sync All…", action: onResyncAll)
+                    .disabled(!status.enabled || resyncInFlight)
                 Button("Sync Now", action: onSyncNow)
-                    .disabled(!status.enabled)
+                    .disabled(!status.enabled || resyncInFlight)
             }
 
             if let error = status.lastError {
@@ -196,6 +266,7 @@ private func makeSyncSettingsPreviewHost() -> some View {
         originalError: "loadIssueModelContainer"
     ))
     return SyncSettingsView()
+        .environment(repo)
         .environment(coordinator)
         .environment(settings)
         .environment(watcher)

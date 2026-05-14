@@ -12,6 +12,7 @@ import ToDragDoCore
 @MainActor
 final class SettingsWindow {
     private var window: NSWindow?
+    private let repository: Repository
     private let settings: AppSettings
     private let coordinator: SyncCoordinator
     private let accountWatcher: CloudKitAccountWatcher
@@ -19,12 +20,14 @@ final class SettingsWindow {
     private let dataLocation: DataLocation
 
     init(
+        repository: Repository,
         settings: AppSettings,
         coordinator: SyncCoordinator,
         accountWatcher: CloudKitAccountWatcher,
         storageHealth: StorageHealth,
         dataLocation: DataLocation
     ) {
+        self.repository = repository
         self.settings = settings
         self.coordinator = coordinator
         self.accountWatcher = accountWatcher
@@ -37,6 +40,7 @@ final class SettingsWindow {
             let host = NSHostingController(
                 rootView: AnyView(
                     SettingsView()
+                        .environment(repository)
                         .environment(settings)
                         .environment(coordinator)
                         .environment(accountWatcher)

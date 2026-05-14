@@ -51,6 +51,7 @@ final class PanelController {
 
         self.panel = panel
         self.settingsWindow = SettingsWindow(
+            repository: repository,
             settings: settings,
             coordinator: coordinator,
             accountWatcher: accountWatcher,
