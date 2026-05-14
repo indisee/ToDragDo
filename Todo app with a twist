@@ -1,0 +1,67 @@
+Todo app with a twist
+
+Native app (not web-page)
+
+Platform:
+- first MacOS
+- potentially Windows
+- potentially Mobiles
+
+Good to have common core to possibly share between platforms int he future
+
+Workflow:
+
+Always on top rectangular area, consistms of two areas
+Area 1:
+- can tap/click to start typing todo note
+- can drag-n-drop anything in the area
+
+Area 2:
+Todo items for today, shows as a list of short description. Click on each of them will show full item in-place (animated fold/unfold)
+Area 2 should be hidden while screen sharing is on.
+
+——————
+
+- When new item added (via text or drag-n-drop) — add it to the Area2 in the end of the list
+- Each item can be moved to the "Libmo" (temporary "folder" for everything non-today) — fast action
+- Each item can be moved to the "Tomorrow" — fast action
+- Each item can be marked as "Done" and move to Done folder
+- At the end of the day — everything left from today moves to tomorrow 
+- Next day should start from the everything from "tomorrow list"
+- Folders can be accepted throung the status bar app icon
+
+
+Core requirements:
+- Drag-n-drop should have an ability to easily add new types of content. Easy way to extend preview/full-view of different items dragged. For example if i drag/paste/type Jira ticket's link — i want to be able to see a special type of preview/full view with potentially some buttons and auth logic. Or I can drag an image — it will be different type. Different type for Zillow link. Etc
+- Platform specific code should be moved to a separate Class/etc
+
+Good to have:
+- Contextual menu to add items (files/text/etc) to the Today/Tomorrow
+
+——————
+
+for fuck sake. let's reiterate what i want:
+
+- text field on top (area 1)
+- list of the items (area 2)
+- both area 1 and each of the items in area 2 supports dropping files/texts/etc into them
+- when something in the process of droping placed over some item/area (parent) — content of the "parent" should be hidden and drag-n-drop support overlay shown
+- each item has text or placeholder if it contains only from attachment
+- text is filled in 1 line in the "closed" item
+- closed item has icons of the attachments
+- on mouse hover item show menu with actions on top of the text and icons
+- when item is opened — full text and all attachments are shown
+- when item is opened menu is shown outside of the item on top of it
+- items can be reordered in the list when they closed
+- items's content should be selectable/copyble for text, and openable for attachments when iten is opened
+- folders working fine for now
+
+—————
+
+a) if opened item is too large — make it fixed height and add scroll inside it. b) move menu in the opened item a little higher, it's overlaping with a text now. c) add ability to change width of the app's main window. d) make pagination inside folder by 10 items, look at a design of how it can look like
+
+————
+
+when next day starts i want today's remaining tasks automatically move to tomorrow. tomorrow became today. and tomorrow became clear ready to fill.
+
+Each item shoyld have an ability to be assigned to particular date. Inside the item "menu" there should be a button for date assign. If asigned date is today - move it to today folder, if tomorrow — move to tomorrow, otherwise move to limbo till the right day starts. If item has assigned date it should be shown insteam of the icon of the left in format dd\nMMM in two lines. if date is the past — item should be in the "today" folder with red color of date
