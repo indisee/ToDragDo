@@ -16,56 +16,51 @@ struct SyncSettingsView: View {
     @State private var resyncSummary: String?
 
     var body: some View {
-        // Plain VStack (not Form/.grouped) so the pane sizes to its actual
-        // content height — matches the General/Appearance panes' pattern
-        // of `.padding(20).frame(width:)` with no height constraint.
-        VStack(alignment: .leading, spacing: 16) {
+        Form {
             if let notice = storageHealth.notice {
-                StorageNoticeBanner(notice: notice)
+                Section {
+                    StorageNoticeBanner(notice: notice)
+                }
             }
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text("Providers")
-                    .font(.headline)
-                HStack(spacing: 6) {
-                    Text("iCloud environment:")
-                        .foregroundStyle(.secondary)
-                    Text(CloudKitEnvironmentProbe.summary)
-                        .font(.system(.caption, design: .monospaced))
-                        .textSelection(.enabled)
-                }
-                .font(.caption)
-                if coordinator.statuses.isEmpty {
+            if coordinator.statuses.isEmpty {
+                Section("Providers") {
                     Text("No sync providers configured.")
                         .foregroundStyle(.secondary)
-                        .padding(.vertical, 6)
-                } else {
-                    VStack(spacing: 0) {
-                        ForEach(Array(coordinator.statuses.enumerated()), id: \.element.id) { idx, status in
-                            if idx > 0 { Divider() }
-                            ProviderRow(
-                                status: status,
-                                resyncInFlight: resyncInFlight && resyncTarget?.providerId == status.providerId,
-                                onToggle: { newValue in
-                                    Task { await handleToggle(status: status, newValue: newValue) }
-                                },
-                                onSyncNow: {
-                                    Task { await coordinator.sync(status.providerId) }
-                                },
-                                onResyncAll: {
-                                    resyncTarget = status
-                                }
-                            )
+                }
+            } else {
+                ForEach(coordinator.statuses, id: \.id) { status in
+                    Section {
+                        ProviderRows(
+                            status: status,
+                            resyncInFlight: resyncInFlight && resyncTarget?.providerId == status.providerId,
+                            onToggle: { newValue in
+                                Task { await handleToggle(status: status, newValue: newValue) }
+                            },
+                            onSyncNow: {
+                                Task { await coordinator.sync(status.providerId) }
+                            },
+                            onResyncAll: {
+                                resyncTarget = status
+                            }
+                        )
+                    } header: {
+                        Text(status.displayName)
+                    } footer: {
+                        if status.providerId == "icloud" {
+                            HStack(spacing: 4) {
+                                Text("Environment:")
+                                Text(CloudKitEnvironmentProbe.summary)
+                                    .monospaced()
+                                    .textSelection(.enabled)
+                            }
                         }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(.quinary, in: RoundedRectangle(cornerRadius: 8))
                 }
             }
         }
-        .padding(20)
-        .frame(width: 480)
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
         .confirmationDialog(
             "Re-sync everything to \(resyncTarget?.displayName ?? "iCloud")?",
             isPresented: Binding(
@@ -137,18 +132,20 @@ private struct StorageNoticeBanner: View {
     let notice: StorageHealth.Notice
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label(notice.title, systemImage: icon)
-                .font(.headline)
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: icon)
                 .foregroundStyle(tint)
-            Text(notice.message)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                .imageScale(.large)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(notice.title)
+                    .font(.headline)
+                Text(notice.message)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(tint.opacity(0.1), in: RoundedRectangle(cornerRadius: 8))
     }
 
     private var icon: String {
@@ -168,7 +165,10 @@ private struct StorageNoticeBanner: View {
     }
 }
 
-private struct ProviderRow: View {
+/// All the rows that belong inside a provider's Section. Returned as a
+/// `Group` so the parent `Section` shows them as discrete rows rather
+/// than collapsing them into one nested view.
+private struct ProviderRows: View {
     let status: SyncStatus
     let resyncInFlight: Bool
     let onToggle: (Bool) -> Void
@@ -176,68 +176,32 @@ private struct ProviderRow: View {
     let onResyncAll: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(status.displayName)
-                    .font(.headline)
-                Spacer()
-                Toggle(
-                    "",
-                    isOn: Binding(
-                        get: { status.enabled },
-                        set: onToggle
-                    )
-                )
-                .labelsHidden()
-            }
+        Toggle("Enable sync", isOn: Binding(
+            get: { status.enabled },
+            set: onToggle
+        ))
 
-            HStack(spacing: 12) {
-                metric("Last sync", value: relative(status.lastSuccess))
-                metric("Pending", value: "\(status.pendingPushCount)")
-                Spacer()
-                if resyncInFlight {
-                    ProgressView()
-                        .controlSize(.small)
-                }
-                Button("Re-sync All…", action: onResyncAll)
-                    .disabled(!status.enabled || resyncInFlight)
-                Button("Sync Now", action: onSyncNow)
-                    .disabled(!status.enabled || resyncInFlight)
-            }
-
-            if let error = status.lastError {
-                VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .top, spacing: 6) {
-                        Image(systemName: "exclamationmark.triangle")
-                            .foregroundStyle(.red)
-                        Text(error)
-                            .font(.system(.caption, design: .monospaced))
-                            .foregroundStyle(.red)
-                            .textSelection(.enabled)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    Button("Copy Error") {
-                        NSPasteboard.general.clearContents()
-                        NSPasteboard.general.setString(error, forType: .string)
-                    }
-                    .controlSize(.small)
-                    .buttonStyle(.borderless)
-                }
-                .padding(8)
-                .background(.red.opacity(0.08), in: RoundedRectangle(cornerRadius: 6))
-            }
-        }
-        .padding(.vertical, 4)
-    }
-
-    private func metric(_ label: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(label)
-                .font(.caption2)
+        LabeledContent("Last sync", value: relative(status.lastSuccess))
+        LabeledContent("Pending") {
+            Text("\(status.pendingPushCount)")
+                .monospacedDigit()
                 .foregroundStyle(.secondary)
-            Text(value)
-                .font(.caption)
+        }
+
+        if let error = status.lastError {
+            ProviderErrorRow(error: error)
+        }
+
+        HStack {
+            Spacer()
+            if resyncInFlight {
+                ProgressView()
+                    .controlSize(.small)
+            }
+            Button("Re-sync All…", action: onResyncAll)
+                .disabled(!status.enabled || resyncInFlight)
+            Button("Sync Now", action: onSyncNow)
+                .disabled(!status.enabled || resyncInFlight)
         }
     }
 
@@ -246,6 +210,33 @@ private struct ProviderRow: View {
         let f = RelativeDateTimeFormatter()
         f.unitsStyle = .abbreviated
         return f.localizedString(for: date, relativeTo: .now)
+    }
+}
+
+private struct ProviderErrorRow: View {
+    let error: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top, spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.red)
+                Text(error)
+                    .font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.red)
+                    .textSelection(.enabled)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            HStack {
+                Spacer()
+                Button("Copy Error") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(error, forType: .string)
+                }
+                .controlSize(.small)
+            }
+        }
     }
 }
 
@@ -271,7 +262,7 @@ private func makeSyncSettingsPreviewHost() -> some View {
         .environment(settings)
         .environment(watcher)
         .environment(health)
-        .frame(width: 480, height: 360)
+        .frame(width: SettingsLayout.width, height: SettingsLayout.height)
 }
 
 #Preview {

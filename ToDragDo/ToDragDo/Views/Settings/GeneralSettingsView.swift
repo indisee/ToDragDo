@@ -11,65 +11,59 @@ struct GeneralSettingsView: View {
     var body: some View {
         @Bindable var settings = settings
         Form {
-            Section("Privacy") {
+            Section {
                 Toggle("Hide during screen sharing", isOn: $settings.hideFromScreenSharing)
+            } header: {
+                Text("Privacy")
+            } footer: {
+                Text("Excludes every ToDragDo window from screenshots, screen recordings, and shared screens.")
             }
 
-            Section("Limbo") {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Stepper(
-                        value: $settings.limboBlinkDays,
-                        in: AppSettings.limboBlinkDaysRange
-                    ) {
-                        Text(limboBlinkLabel)
+            Section {
+                Stepper(
+                    value: $settings.limboBlinkDays,
+                    in: AppSettings.limboBlinkDaysRange
+                ) {
+                    LabeledContent("Blink idle items") {
+                        Text(limboValueText)
+                            .monospacedDigit()
+                            .foregroundStyle(.secondary)
                     }
-                    .fixedSize()
-                    Text(limboBlinkHint)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
+            } header: {
+                Text("Limbo")
+            } footer: {
+                Text(limboFooterText)
             }
 
             Section("Data Location") {
-                HStack(alignment: .top, spacing: 8) {
+                LabeledContent("Folder") {
                     Text(dataLocation.resolvedDirectory.path)
                         .font(.system(.body, design: .monospaced))
                         .textSelection(.enabled)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    Button {
-                        copyPath()
-                    } label: {
-                        Image(systemName: "doc.on.doc")
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Copy path")
-
-                    Button {
-                        revealInFinder()
-                    } label: {
-                        Image(systemName: "folder")
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Show in Finder")
+                        .lineLimit(2)
+                        .truncationMode(.middle)
+                        .multilineTextAlignment(.trailing)
+                }
+                HStack {
+                    Spacer()
+                    Button("Copy Path", action: copyPath)
+                    Button("Reveal in Finder", action: revealInFinder)
                 }
             }
         }
-        .padding(20)
-        .frame(width: 480)
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
     }
 
-    private var limboBlinkLabel: LocalizedStringKey {
+    private var limboValueText: String {
         let n = settings.limboBlinkDays
-        if n == 0 { return "Days before Limbo blinks: off" }
-        if n == 1 { return "Days before Limbo blinks: 1 day" }
-        return "Days before Limbo blinks: \(n) days"
+        if n == 0 { return "Off" }
+        if n == 1 { return "1 day" }
+        return "\(n) days"
     }
 
-    private var limboBlinkHint: LocalizedStringKey {
+    private var limboFooterText: String {
         settings.limboBlinkDays == 0
             ? "Limbo items never blink."
             : "Items idle in Limbo this long start blinking red. Opening an item resets its timer."

@@ -14,46 +14,35 @@ struct ProjectsSettingsView: View {
     @State private var errorMessage: String?
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            list
-            Divider()
-            addRow
-            if let errorMessage {
-                Text(errorMessage)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.red)
-                    .padding(.horizontal, 16)
-                    .padding(.top, 6)
-            }
-        }
-        .padding(.vertical, 16)
-        .frame(width: 480, height: 360)
-    }
-
-    private var list: some View {
-        ScrollView {
-            VStack(spacing: 0) {
+        Form {
+            Section("Projects") {
                 ForEach(repository.projects) { project in
                     ProjectRow(project: project) { action in
                         handle(action, on: project)
                     }
-                    Divider().opacity(0.4)
+                }
+            }
+
+            Section {
+                HStack(spacing: 8) {
+                    ColorSwatchPicker(hex: $newColor)
+                    TextField("Project name", text: $newName)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit(submitNew)
+                    Button("Add", action: submitNew)
+                        .disabled(trimmedNewName.isEmpty)
+                }
+            } header: {
+                Text("Add Project")
+            } footer: {
+                if let errorMessage {
+                    Text(errorMessage)
+                        .foregroundStyle(.red)
                 }
             }
         }
-    }
-
-    private var addRow: some View {
-        HStack(spacing: 8) {
-            ColorSwatchPicker(hex: $newColor)
-            TextField("New project", text: $newName)
-                .textFieldStyle(.roundedBorder)
-                .onSubmit(submitNew)
-            Button("Add", action: submitNew)
-                .disabled(trimmedNewName.isEmpty)
-        }
-        .padding(.horizontal, 16)
-        .padding(.top, 10)
+        .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
     }
 
     private var trimmedNewName: String {
@@ -144,8 +133,6 @@ private struct ProjectRow: View {
                 .help("Delete (items move to Work)")
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 8)
         .onChange(of: project.colorHex) { _, new in
             if new != colorHex { colorHex = new }
         }

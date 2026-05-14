@@ -69,7 +69,15 @@ final class MenuBarStatusItem: NSObject, NSMenuDelegate {
     }
 
     @objc private func showSettings() {
-        panelController?.showSettings()
+        // Dispatch async so the status-bar menu finishes its tracking
+        // run-loop mode before we try to activate the app. Calling
+        // `NSApp.activate()` synchronously from inside menu tracking
+        // gets swallowed on the first click, leaving the Settings
+        // window built but never ordered front.
+        let controller = panelController
+        DispatchQueue.main.async {
+            controller?.showSettings()
+        }
     }
 
     @objc private func quit() {

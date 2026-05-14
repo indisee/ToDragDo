@@ -48,10 +48,10 @@ final class SettingsWindow {
                         .environment(dataLocation)
                 )
             )
-            // Track the SwiftUI tree's preferred content size so the
-            // window resizes when the active tab changes. Without this
-            // the TabView grows to fit the largest tab on first open
-            // and never shrinks back when a smaller tab is selected.
+            // The SwiftUI tree fixes its own size via `SettingsLayout`,
+            // identical for every tab. Tracking preferred content size
+            // is still useful (it sizes the window to fit on first
+            // display) but the tabs no longer cause the window to jump.
             host.sizingOptions = [.preferredContentSize]
             let window = NSWindow(contentViewController: host)
             window.title = "ToDragDo Settings"
@@ -62,8 +62,15 @@ final class SettingsWindow {
             window.center()
             self.window = window
         }
-        window?.sharingType = settings.hideFromScreenSharing ? .none : .readOnly
+        guard let window else { return }
+        window.sharingType = settings.hideFromScreenSharing ? .none : .readOnly
+        // `.accessory` apps need a forced front-order: `NSApp.activate()`
+        // is async, and `makeKeyAndOrderFront` silently no-ops if the app
+        // isn't already active. `orderFrontRegardless()` puts the window
+        // on screen regardless of activation state — same pattern the
+        // floating panel uses successfully.
         NSApp.activate()
-        window?.makeKeyAndOrderFront(nil)
+        window.makeKeyAndOrderFront(nil)
+        window.orderFrontRegardless()
     }
 }
