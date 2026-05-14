@@ -40,6 +40,10 @@ struct InputBar: View {
                         .onChange(of: panelState.editingItemId) { _, newValue in
                             if newValue != nil { isFieldFocused = true }
                         }
+                    ProjectBadge(
+                        behavior: badgeBehavior,
+                        style: .named
+                    )
                 }
             }
 
@@ -79,6 +83,29 @@ struct InputBar: View {
         isEditing ? "Edit and press Return…" : "Type, paste, or drop…"
     }
 
+    /// Project chip behavior. In add mode the chip drives the per-input
+    /// `inputProjectId`. In edit mode it reflects the item being edited
+    /// and reassigns its project immediately on pick (consistent with
+    /// the per-row dot — independent of the Return-to-save note edit).
+    /// Chip behavior. Edit mode mutates the local `editingProjectId`
+    /// (committed alongside the note on Return); add mode mutates
+    /// `inputProjectId`. Either way the badge change is pure UI — no
+    /// repository write, no CloudKit push — until submit.
+    private var badgeBehavior: ProjectBadge.Behavior {
+        if panelState.editingItemId != nil {
+            return .single(
+                current: panelState.editingProjectId,
+                allowFlip: true,
+                onPick: { panelState.editingProjectId = $0 }
+            )
+        }
+        return .single(
+            current: panelState.inputProjectId,
+            allowFlip: true,
+            onPick: { panelState.inputProjectId = $0 }
+        )
+    }
+
     /// Leading slot. Edit mode swaps in a clickable cancel icon; add
     /// mode shows a static plus/paperclip indicator.
     @ViewBuilder
@@ -102,14 +129,18 @@ struct InputBar: View {
         let note = panelState.inputDraft.trimmingCharacters(in: .whitespacesAndNewlines)
 
         if let editId = panelState.editingItemId {
-            // Editing path: rewrite the existing item's note and restore
-            // whatever draft was sitting in the field beforehand.
+            // Editing path: rewrite the existing item's note + project
+            // in one update, then restore the pre-edit draft.
+            let projectId = panelState.editingProjectId
             do {
                 try await repository.update(id: editId) { item in
                     var payload = ItemPayload.decode(item.payload)
                     payload.note = note
                     if let data = try? payload.encoded() {
                         item.payload = data
+                    }
+                    if let projectId, projectId != item.projectId {
+                        item.projectId = projectId
                     }
                 }
             } catch {
@@ -127,7 +158,8 @@ struct InputBar: View {
             try await repository.add(
                 folder: panelState.selectedFolder,
                 typeIdentifier: typeIdentifier,
-                payload: try payload.encoded()
+                payload: try payload.encoded(),
+                projectId: panelState.inputProjectId
             )
             panelState.inputDraft = ""
             panelState.pendingAttachments = []

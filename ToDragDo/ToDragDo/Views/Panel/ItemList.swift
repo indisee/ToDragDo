@@ -17,9 +17,14 @@ struct ItemList: View {
     private static let pageSize = 10
 
     var body: some View {
-        let allItems = panelState.isTrashOpen
+        let unfiltered = panelState.isTrashOpen
             ? repository.trashItems
             : (repository.items[panelState.selectedFolder] ?? [])
+        let allItems: [Item] = {
+            let filter = panelState.filterProjectIds
+            guard !filter.isEmpty else { return unfiltered }
+            return unfiltered.filter { filter.contains($0.projectId) }
+        }()
         VStack(spacing: 0) {
             if allItems.isEmpty {
                 emptyPlaceholder
@@ -77,6 +82,16 @@ struct ItemList: View {
 
         HStack(spacing: 4) {
             settingsButton
+            ProjectBadge(
+                behavior: .multi(
+                    selected: panelState.filterProjectIds,
+                    onToggle: { panelState.toggleFilterProject($0) },
+                    onAll: { panelState.filterProjectIds = [] }
+                ),
+                style: .square
+            )
+            .padding(.leading, 2)
+            .padding(.trailing, 10)
             if items.count > 0, totalPages > 1 {
                 PaginationBar(
                     page: page,

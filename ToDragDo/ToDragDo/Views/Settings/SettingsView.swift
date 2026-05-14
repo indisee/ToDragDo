@@ -7,6 +7,8 @@ struct SettingsView: View {
         TabView {
             GeneralSettingsView()
                 .tabItem { Label("General", systemImage: "gearshape") }
+            ProjectsSettingsView()
+                .tabItem { Label("Projects", systemImage: "folder") }
             SyncSettingsView()
                 .tabItem { Label("Sync", systemImage: "arrow.triangle.2.circlepath.icloud") }
             AppearanceSettingsView()

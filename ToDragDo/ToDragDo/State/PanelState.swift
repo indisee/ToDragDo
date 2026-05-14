@@ -26,6 +26,10 @@ final class PanelState {
     /// edit; the user's prior draft is stashed in `savedDraftBeforeEdit`
     /// and restored when editing finishes or cancels.
     var editingItemId: UUID? = nil
+    /// Project assigned to the item being edited. Local UI state — not
+    /// persisted until `Return` commits the edit, so flipping projects
+    /// mid-edit doesn't churn the outbox or fire CloudKit pushes.
+    var editingProjectId: UUID? = nil
     private var savedDraftBeforeEdit: String? = nil
     private var savedAttachmentsBeforeEdit: [Attachment]? = nil
     /// Zero-based page index for the current folder list. Resets to 0
@@ -40,6 +44,27 @@ final class PanelState {
             guard oldValue != isTrashOpen else { return }
             currentPage = 0
             expandedItemId = nil
+        }
+    }
+    /// Project assigned to new items submitted through the input bar.
+    /// Defaults to Work; flips/picks via the badge next to the field.
+    var inputProjectId: UUID = Project.workId
+    /// Filter applied to the visible item list. Empty set shows items
+    /// from every project (the gray "All" state); any non-empty set
+    /// keeps only items whose `projectId` is in it.
+    var filterProjectIds: Set<UUID> = [] {
+        didSet {
+            guard oldValue != filterProjectIds else { return }
+            currentPage = 0
+            expandedItemId = nil
+        }
+    }
+
+    func toggleFilterProject(_ id: UUID) {
+        if filterProjectIds.contains(id) {
+            filterProjectIds.remove(id)
+        } else {
+            filterProjectIds.insert(id)
         }
     }
 
@@ -60,12 +85,13 @@ final class PanelState {
     /// and close the expanded row. If an edit is already in progress, it
     /// is cancelled (the original stashed draft survives — the partially
     /// edited text is discarded).
-    func beginEdit(itemId: UUID, note: String) {
+    func beginEdit(itemId: UUID, note: String, projectId: UUID) {
         if editingItemId == nil {
             savedDraftBeforeEdit = inputDraft
             savedAttachmentsBeforeEdit = pendingAttachments
         }
         editingItemId = itemId
+        editingProjectId = projectId
         inputDraft = note
         pendingAttachments = []
         expandedItemId = nil
@@ -76,6 +102,7 @@ final class PanelState {
         inputDraft = savedDraftBeforeEdit ?? ""
         pendingAttachments = savedAttachmentsBeforeEdit ?? []
         editingItemId = nil
+        editingProjectId = nil
         savedDraftBeforeEdit = nil
         savedAttachmentsBeforeEdit = nil
     }

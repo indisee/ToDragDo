@@ -39,6 +39,9 @@ struct FolderTabBar: View {
     }
 
     private func count(for folder: Folder) -> Int? {
-        repository.items[folder]?.count
+        guard let items = repository.items[folder] else { return nil }
+        let filter = panelState.filterProjectIds
+        guard !filter.isEmpty else { return items.count }
+        return items.lazy.filter { filter.contains($0.projectId) }.count
     }
 }

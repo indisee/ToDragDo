@@ -62,6 +62,21 @@ public protocol ItemStorage: Sendable {
 
     /// Remote-originated hard delete; no outbox row. Always wins.
     func hardDeleteWithoutChange(id: UUID) async throws
+
+    // MARK: - Projects
+
+    /// All projects sorted by `orderKey` ascending.
+    func projects() async throws -> [Project]
+
+    /// Inserts or updates a project row. No outbox row — project entities
+    /// aren't synced (yet); items reference projects by id, and unknown
+    /// ids resolve to Work at the Repository layer.
+    func upsertProject(_ project: Project) async throws
+
+    /// Removes a project row. Items previously assigned to it are
+    /// reassigned to `reassignTo` in the same transaction. The two ids
+    /// must differ.
+    func deleteProject(id: UUID, reassignTo: UUID) async throws
 }
 
 public enum StorageError: Error, Sendable, Equatable {

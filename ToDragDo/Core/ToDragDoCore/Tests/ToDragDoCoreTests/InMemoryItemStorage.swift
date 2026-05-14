@@ -130,6 +130,28 @@ actor InMemoryItemStorage: ItemStorage {
         items.removeValue(forKey: id)
     }
 
+    // MARK: - Projects
+
+    private var projectStore: [UUID: Project] = [:]
+
+    func projects() async throws -> [Project] {
+        projectStore.values.sorted { $0.orderKey < $1.orderKey }
+    }
+
+    func upsertProject(_ project: Project) async throws {
+        projectStore[project.id] = project
+    }
+
+    func deleteProject(id: UUID, reassignTo: UUID) async throws {
+        guard id != reassignTo else { return }
+        for (itemId, var item) in items where item.projectId == id {
+            item.projectId = reassignTo
+            item.updatedAt = .now
+            items[itemId] = item
+        }
+        projectStore.removeValue(forKey: id)
+    }
+
     // MARK: - Test helpers
 
     func allChanges() -> [ChangeRecord] {

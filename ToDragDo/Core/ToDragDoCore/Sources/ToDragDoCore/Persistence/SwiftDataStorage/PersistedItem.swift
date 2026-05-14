@@ -15,6 +15,9 @@ final class PersistedItem {
     var lastEditedBy: String = ""
     var dueDate: Date?
     var completedAt: Date?
+    /// Defaulted so existing rows lightweight-migrate to Work without
+    /// schema surgery. Stays in sync with `Item.projectId`.
+    var projectId: UUID = Project.workId
 
     init(from dto: Item) {
         self.id = dto.id
@@ -26,6 +29,7 @@ final class PersistedItem {
         self.updatedAt = dto.updatedAt
         self.deletedAt = dto.deletedAt
         self.lastEditedBy = dto.lastEditedBy
+        self.projectId = dto.projectId
         self.dueDate = dto.dueDate
         self.completedAt = dto.completedAt
     }
@@ -38,6 +42,7 @@ final class PersistedItem {
         self.updatedAt = dto.updatedAt
         self.deletedAt = dto.deletedAt
         self.lastEditedBy = dto.lastEditedBy
+        self.projectId = dto.projectId
         self.dueDate = dto.dueDate
         self.completedAt = dto.completedAt
     }
@@ -53,6 +58,7 @@ final class PersistedItem {
             updatedAt: updatedAt,
             deletedAt: deletedAt,
             lastEditedBy: lastEditedBy,
+            projectId: projectId,
             dueDate: dueDate,
             completedAt: completedAt
         )

@@ -271,7 +271,49 @@ public final class SwiftDataStorage: ItemStorage {
         }
     }
 
+    // MARK: - Projects
+
+    public func projects() async throws -> [Project] {
+        let descriptor = FetchDescriptor<PersistedProject>(
+            sortBy: [SortDescriptor(\.orderKey)]
+        )
+        return try ctx.fetch(descriptor).map { $0.toDTO() }
+    }
+
+    public func upsertProject(_ project: Project) async throws {
+        try ctx.transaction {
+            if let existing = try fetchPersistedProject(id: project.id) {
+                existing.apply(project)
+            } else {
+                ctx.insert(PersistedProject(from: project))
+            }
+        }
+    }
+
+    public func deleteProject(id: UUID, reassignTo: UUID) async throws {
+        guard id != reassignTo else { return }
+        try ctx.transaction {
+            let descriptor = FetchDescriptor<PersistedItem>(
+                predicate: #Predicate { $0.projectId == id }
+            )
+            for row in try ctx.fetch(descriptor) {
+                row.projectId = reassignTo
+                row.updatedAt = .now
+            }
+            if let row = try fetchPersistedProject(id: id) {
+                ctx.delete(row)
+            }
+        }
+    }
+
     // MARK: - Helpers
+
+    private func fetchPersistedProject(id: UUID) throws -> PersistedProject? {
+        let descriptor = FetchDescriptor<PersistedProject>(
+            predicate: #Predicate { $0.id == id }
+        )
+        return try ctx.fetch(descriptor).first
+    }
 
     private func fetchPersistedItem(id: UUID) throws -> PersistedItem? {
         let descriptor = FetchDescriptor<PersistedItem>(

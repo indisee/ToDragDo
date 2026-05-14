@@ -86,6 +86,7 @@ struct ItemRow: View {
         .contentShape(Rectangle())
         .onHoverStable { isRowHover = $0 }
         .overlay(alignment: .top) { reorderIndicator }
+        .overlay(alignment: .topLeading) { projectDot }
         .overlay(alignment: .topTrailing) { actionsOverlay }
         .dropTarget(
             .item(item.id),
@@ -271,6 +272,30 @@ struct ItemRow: View {
 
     // MARK: - Visual feedback
 
+    /// Tiny colored dot in the row's top-left corner that reflects the
+    /// item's project assignment. Trash and reorder states hide it so
+    /// the corresponding overlays read cleanly.
+    @ViewBuilder
+    private var projectDot: some View {
+        if !isReceivingDrop, !isReorderTarget {
+            ProjectBadge(
+                behavior: .single(
+                    current: item.projectId,
+                    allowFlip: false,
+                    onPick: { picked in
+                        guard picked != item.projectId else { return }
+                        Task {
+                            try? await repository.setProject(itemId: item.id, to: picked)
+                        }
+                    }
+                ),
+                style: .dot
+            )
+            .padding(.leading, 3)
+            .padding(.top, 3)
+        }
+    }
+
     /// Thin accent line at the top of the row while an in-app drag
     /// is hovering — indicates "the dropped item lands above this row".
     @ViewBuilder
@@ -349,7 +374,7 @@ struct ItemRow: View {
     /// `beginEdit` stashes any draft already in the bar so it can be
     /// restored once the user finishes (or cancels) the edit.
     private func edit() {
-        panelState.beginEdit(itemId: item.id, note: payload.note)
+        panelState.beginEdit(itemId: item.id, note: payload.note, projectId: item.projectId)
     }
 
     private func dispatch(_ action: RowAction) {

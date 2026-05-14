@@ -8,6 +8,9 @@ public final class Repository: RemoteApplier {
     /// Soft-deleted items within the trash retention window, most recently
     /// deleted first. Refreshed by `reload()`.
     public private(set) var trashItems: [Item] = []
+    /// All projects, sorted by `orderKey`. Refreshed by `reload()` and
+    /// seeded with `Project.defaults` on first launch.
+    public private(set) var projects: [Project] = []
 
     public static let trashRetention: TimeInterval = 30 * 24 * 60 * 60
 
@@ -49,6 +52,31 @@ public final class Repository: RemoteApplier {
         items = fresh
         let cutoff = Date.now.addingTimeInterval(-Self.trashRetention)
         trashItems = try await storage.trashItems(since: cutoff)
+
+        var stored = try await storage.projects()
+        // First launch (and any prior install that's missing a default
+        // row): re-insert defaults so Work and Personal are always
+        // resolvable for the migration fallback.
+        let storedIds = Set(stored.map(\.id))
+        let missing = Project.defaults.filter { !storedIds.contains($0.id) }
+        if !missing.isEmpty {
+            for project in missing {
+                try await storage.upsertProject(project)
+            }
+            stored = try await storage.projects()
+        }
+        projects = stored
+    }
+
+    /// Resolves `id` to a known project, falling back to Work for unknown
+    /// ids (e.g. items pulled from a device that hasn't synced its
+    /// project list yet).
+    public func project(for id: UUID) -> Project {
+        if let match = projects.first(where: { $0.id == id }) {
+            return match
+        }
+        return projects.first(where: { $0.id == Project.workId })
+            ?? Project.defaultWork()
     }
 
     /// `reload()` + fire `onWriteCallback`. Used by every user-initiated
@@ -64,7 +92,8 @@ public final class Repository: RemoteApplier {
     public func add(
         folder: Folder,
         typeIdentifier: String,
-        payload: Data
+        payload: Data,
+        projectId: UUID = Project.workId
     ) async throws -> Item {
         // New items prepend to the folder so the user sees them
         // immediately without scrolling/paging — orderKey one tick
@@ -75,12 +104,66 @@ public final class Repository: RemoteApplier {
             orderKey: firstKey - 1,
             typeIdentifier: typeIdentifier,
             payload: payload,
-            lastEditedBy: deviceId
+            lastEditedBy: deviceId,
+            projectId: projectId
         )
         let change = makeChange(op: .insert, item: item)
         try await storage.upsert(item, change: change)
         try await reloadAndNotify()
         return item
+    }
+
+    /// Reassign an existing item to a different project. No-op if the
+    /// project already matches.
+    public func setProject(itemId: UUID, to projectId: UUID) async throws {
+        guard var item = try await storage.item(id: itemId) else {
+            throw StorageError.notFound(itemId)
+        }
+        guard item.projectId != projectId else { return }
+        item.projectId = projectId
+        item.updatedAt = .now
+        item.lastEditedBy = deviceId
+        let change = makeChange(op: .update, item: item)
+        try await storage.upsert(item, change: change)
+        try await reloadAndNotify()
+    }
+
+    // MARK: - Project CRUD
+
+    /// Create a new project. `orderKey` defaults to one past the
+    /// current max so it lands at the end of the list.
+    @discardableResult
+    public func addProject(name: String, colorHex: String) async throws -> Project {
+        let nextKey = (projects.map(\.orderKey).max() ?? 0) + 1
+        let project = Project(name: name, colorHex: colorHex, orderKey: nextKey)
+        try await storage.upsertProject(project)
+        try await reload()
+        return project
+    }
+
+    public func renameProject(id: UUID, to name: String) async throws {
+        guard var project = projects.first(where: { $0.id == id }) else { return }
+        project.name = name
+        project.updatedAt = .now
+        try await storage.upsertProject(project)
+        try await reload()
+    }
+
+    public func recolorProject(id: UUID, to colorHex: String) async throws {
+        guard var project = projects.first(where: { $0.id == id }) else { return }
+        project.colorHex = colorHex
+        project.updatedAt = .now
+        try await storage.upsertProject(project)
+        try await reload()
+    }
+
+    /// Delete a custom project. Items assigned to it are reassigned to
+    /// `reassignTo` (default: Work). Refuses to delete the seed Work
+    /// project — it's the system-wide migration fallback.
+    public func deleteProject(id: UUID, reassignTo: UUID = Project.workId) async throws {
+        guard id != Project.workId else { return }
+        try await storage.deleteProject(id: id, reassignTo: reassignTo)
+        try await reloadAndNotify()
     }
 
     public func update(id: UUID, mutate: (inout Item) -> Void) async throws {

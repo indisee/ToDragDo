@@ -10,6 +10,11 @@ public struct Item: Identifiable, Sendable, Codable, Hashable {
     public var updatedAt: Date
     public var deletedAt: Date?
     public var lastEditedBy: String
+    /// Project this item belongs to. Always set: items pre-dating the
+    /// project concept (and any incoming records that reference an
+    /// unknown project) fall back to `Project.workId` at the storage
+    /// boundary.
+    public var projectId: UUID
     /// Optional calendar day the user wants to act on this item. Items
     /// with a future `dueDate` live in Limbo until their day arrives;
     /// items whose day is today or earlier sit in Today (with past-due
@@ -32,6 +37,7 @@ public struct Item: Identifiable, Sendable, Codable, Hashable {
         updatedAt: Date = .now,
         deletedAt: Date? = nil,
         lastEditedBy: String,
+        projectId: UUID = Project.workId,
         dueDate: Date? = nil,
         completedAt: Date? = nil
     ) {
@@ -44,7 +50,33 @@ public struct Item: Identifiable, Sendable, Codable, Hashable {
         self.updatedAt = updatedAt
         self.deletedAt = deletedAt
         self.lastEditedBy = lastEditedBy
+        self.projectId = projectId
         self.dueDate = dueDate
         self.completedAt = completedAt
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, folder, orderKey, typeIdentifier, payload
+        case createdAt, updatedAt, deletedAt, lastEditedBy
+        case projectId, dueDate, completedAt
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(UUID.self, forKey: .id)
+        self.folder = try c.decode(Folder.self, forKey: .folder)
+        self.orderKey = try c.decode(Double.self, forKey: .orderKey)
+        self.typeIdentifier = try c.decode(String.self, forKey: .typeIdentifier)
+        self.payload = try c.decode(Data.self, forKey: .payload)
+        self.createdAt = try c.decode(Date.self, forKey: .createdAt)
+        self.updatedAt = try c.decode(Date.self, forKey: .updatedAt)
+        self.deletedAt = try c.decodeIfPresent(Date.self, forKey: .deletedAt)
+        self.lastEditedBy = try c.decode(String.self, forKey: .lastEditedBy)
+        // Older snapshots (and any remote record from a device that
+        // hasn't shipped the Project field yet) decode to Work — the
+        // migration default.
+        self.projectId = try c.decodeIfPresent(UUID.self, forKey: .projectId) ?? Project.workId
+        self.dueDate = try c.decodeIfPresent(Date.self, forKey: .dueDate)
+        self.completedAt = try c.decodeIfPresent(Date.self, forKey: .completedAt)
     }
 }
