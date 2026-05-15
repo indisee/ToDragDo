@@ -32,6 +32,7 @@ struct ItemList: View {
                 paginated(items: allItems)
             }
             bottomBar(items: allItems)
+                .padding(.horizontal, 12)
                 .padding(.top, 6)
         }
     }
@@ -141,6 +142,7 @@ struct ItemList: View {
             .font(.system(size: theme.captionSize))
             .foregroundStyle(.tertiary)
             .frame(maxWidth: .infinity)
+            .padding(.horizontal, 12)
             .padding(.vertical, 16)
     }
 }

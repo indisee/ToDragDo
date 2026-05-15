@@ -37,7 +37,7 @@ private struct ImagePreview: View {
                 Image(nsImage: image)
                     .resizable()
                     .scaledToFit()
-                    .frame(maxWidth: .infinity, maxHeight: 240, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .clipShape(RoundedRectangle(cornerRadius: theme.cornerRadius))
                     .overlay(alignment: .topTrailing) {
                         if isHovering { openButton }

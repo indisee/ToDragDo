@@ -25,12 +25,17 @@ struct PanelView: View {
                 .frame(height: 12)
             VStack(alignment: .leading, spacing: 10) {
                 InputBar()
+                    .padding(.horizontal, 12)
                 tabsRow
+                    .padding(.horizontal, 12)
                 if !panelState.isListCollapsed {
+                    if panelState.selectedFolder == .done && !panelState.isTrashOpen {
+                        DoneSummaryRow()
+                            .padding(.horizontal, 12)
+                    }
                     ItemList()
                 }
             }
-            .padding(.horizontal, 12)
             .padding(.bottom, 12)
         }
         .frame(width: settings.panelWidth)

@@ -16,6 +16,7 @@ final class PanelController {
 
     private let panel: NSPanel
     private let settingsWindow: SettingsWindow
+    private let summaryWindow: SummaryWindow
     private(set) var isVisible: Bool
     private var keyMonitor: Any?
 
@@ -62,6 +63,10 @@ final class PanelController {
             accountWatcher: accountWatcher,
             storageHealth: storageHealth,
             dataLocation: dataLocation
+        )
+        self.summaryWindow = SummaryWindow(
+            repository: repository,
+            settings: settings
         )
         self.isVisible = false
 
@@ -112,6 +117,10 @@ final class PanelController {
 
     func showSettings() {
         settingsWindow.show()
+    }
+
+    func showSummary(mode: SummaryMode) {
+        summaryWindow.show(mode: mode)
     }
 
     private func installToggleHotkey() {

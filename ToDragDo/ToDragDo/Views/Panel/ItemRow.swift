@@ -78,7 +78,7 @@ struct ItemRow: View {
                 // top via the .overlay below.
                 expandedBody
             } else if isReceivingDrop {
-                Color.clear.frame(minHeight: theme.rowHeight)
+                Color.clear.frame(minHeight: 32)
             } else {
                 mainRow
             }
@@ -87,7 +87,7 @@ struct ItemRow: View {
         .contentShape(Rectangle())
         .onHoverStable { isRowHover = $0 }
         .overlay(alignment: .top) { reorderIndicator }
-        .overlay(alignment: .topLeading) { projectDot }
+        .overlay(alignment: .topLeading) { projectDotCorner }
         .overlay(alignment: .topTrailing) { actionsOverlay }
         .dropTarget(
             .item(item.id),
@@ -108,26 +108,83 @@ struct ItemRow: View {
         .zIndex(isExpanded || isHovered ? 1 : 0)
     }
 
-    // MARK: - Main row (badge + text + icons)
+    // MARK: - Main row
 
     private var mainRow: some View {
+        contentLine
+            .padding(.leading, 22)
+            .padding(.trailing, 16)
+            .padding(.vertical, 4)
+            .frame(minHeight: 32, alignment: isExpanded ? .top : .center)
+    }
+
+    /// Top-left project dot, floated as an overlay so the content area
+    /// can use uniform padding without reserving header space.
+    @ViewBuilder
+    private var projectDotCorner: some View {
+        if !isReceivingDrop {
+            ProjectBadge(
+                behavior: .single(
+                    current: item.projectId,
+                    allowFlip: false,
+                    onPick: { picked in
+                        guard picked != item.projectId else { return }
+                        Task {
+                            try? await repository.setProject(itemId: item.id, to: picked)
+                        }
+                    }
+                ),
+                style: .dot
+            )
+            .padding(.leading, 12)
+            .padding(.top, isExpanded ? 10 : 14)
+        }
+    }
+
+    /// Done items show completion; other folders show due-date when set.
+    private var headerDate: Date? {
+        if item.folder == .done { return completedStamp }
+        return item.dueDate
+    }
+
+    /// Past due in non-Done folders renders in red (mirrors the old
+    /// TypeBadge red treatment that this header replaces).
+    private var headerDateColor: Color {
+        if item.folder != .done,
+           let due = item.dueDate,
+           Calendar.autoupdatingCurrent.startOfDay(for: due)
+            < Calendar.autoupdatingCurrent.startOfDay(for: .now) {
+            return .red
+        }
+        return .secondary
+    }
+
+    /// Note + optional date stamp + attachment icon strip. The date sits
+    /// between text and attachments so it stays visible when the note
+    /// truncates from the right.
+    private var contentLine: some View {
         HStack(alignment: isExpanded ? .top : .center, spacing: 8) {
-            TypeBadge(typeIdentifier: item.typeIdentifier, dueDate: item.dueDate)
-                .frame(width: 24, height: theme.rowHeight)
             noteText
-            AttachmentIconStrip(attachments: payload.attachments)
-                .frame(height: theme.rowHeight)
-            if item.folder == .done, let stamp = completedStamp, !isHovered {
-                Text(stamp, format: .dateTime.day(.twoDigits).month(.abbreviated))
-                    .font(.system(size: theme.captionSize, design: .rounded))
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-                    .accessibilityLabel("Completed \(stamp.formatted(date: .abbreviated, time: .omitted))")
+            if item.folder == .done {
+                AttachmentIconStrip(attachments: payload.attachments)
+                if let stamp = headerDate {
+                    dateStamp(stamp)
+                }
+            } else {
+                if let stamp = headerDate {
+                    dateStamp(stamp)
+                }
+                AttachmentIconStrip(attachments: payload.attachments)
             }
         }
-        .padding(.horizontal, 10)
-        .frame(minHeight: theme.rowHeight)
+    }
+
+    private func dateStamp(_ stamp: Date) -> some View {
+        Text(stamp, format: .dateTime.day(.twoDigits).month(.abbreviated))
+            .font(.system(size: 9, weight: .semibold, design: .rounded))
+            .foregroundStyle(headerDateColor)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
     }
 
     /// Fallback to `updatedAt` for items completed before `completedAt`
@@ -146,15 +203,14 @@ struct ItemRow: View {
                 .font(.system(size: theme.bodySize))
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, minHeight: theme.rowHeight, alignment: .topLeading)
-                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, alignment: .topLeading)
                 .layoutPriority(1)
         } else {
             Text(attributedDisplay)
                 .font(.system(size: theme.bodySize))
                 .lineLimit(1)
                 .truncationMode(.tail)
-                .frame(maxWidth: .infinity, minHeight: theme.rowHeight, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
                 .layoutPriority(1)
         }
     }
@@ -167,12 +223,12 @@ struct ItemRow: View {
             EmptyView()
         } else if isExpanded {
             floatingActionPanel
-                .padding(.trailing, 8)
+                .padding(.trailing, 20)
                 .offset(y: -20)
         } else if isHovered {
             collapsedHoverActions
-                .padding(.trailing, 8)
-                .padding(.top, max(0, (theme.rowHeight - hoverPanelHeight) / 2))
+                .padding(.trailing, 20)
+                .padding(.top, max(0, (32 - hoverPanelHeight) / 2))
         }
     }
 
@@ -253,15 +309,15 @@ struct ItemRow: View {
                 AttachmentPreview(attachment: attachment)
             }
         }
-        .padding(.horizontal, 28)
-        .padding(.bottom, 8)
+        .padding(.leading, 22)
+        .padding(.trailing, 16)
+        .padding(.bottom, 4)
     }
 
     // MARK: - Drag preview
 
     private var dragPreview: some View {
         HStack(spacing: 6) {
-            TypeBadge(typeIdentifier: item.typeIdentifier)
             Text(attributedDisplay)
                 .font(.system(size: theme.bodySize))
                 .lineLimit(1)
@@ -269,32 +325,6 @@ struct ItemRow: View {
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
         .background(.thickMaterial, in: RoundedRectangle(cornerRadius: theme.cornerRadius))
-    }
-
-    // MARK: - Visual feedback
-
-    /// Tiny colored dot in the row's top-left corner that reflects the
-    /// item's project assignment. Trash and reorder states hide it so
-    /// the corresponding overlays read cleanly.
-    @ViewBuilder
-    private var projectDot: some View {
-        if !isReceivingDrop, !isReorderTarget {
-            ProjectBadge(
-                behavior: .single(
-                    current: item.projectId,
-                    allowFlip: false,
-                    onPick: { picked in
-                        guard picked != item.projectId else { return }
-                        Task {
-                            try? await repository.setProject(itemId: item.id, to: picked)
-                        }
-                    }
-                ),
-                style: .dot
-            )
-            .padding(.leading, 3)
-            .padding(.top, 3)
-        }
     }
 
     /// Thin accent line at the top of the row while an in-app drag
@@ -310,19 +340,23 @@ struct ItemRow: View {
 
     @ViewBuilder
     private var rowBackground: some View {
+        let shape = RoundedRectangle(cornerRadius: 6)
         if isStaleInLimbo {
             // Pulsing red wash signals "this has sat in Limbo too long".
             // Layered under any hover tint so the warning still shows
             // when the cursor isn't over the row.
-            Color.red
+            shape
+                .fill(.red)
                 .phaseAnimator([0.06, 0.22]) { content, opacity in
                     content.opacity(opacity)
                 } animation: { _ in
                     .easeInOut(duration: 0.7)
                 }
-                .overlay(isHovered ? theme.accent.opacity(0.06) : Color.clear)
+                .overlay {
+                    if isHovered { shape.fill(theme.accent.opacity(0.06)) }
+                }
         } else if isHovered {
-            theme.accent.opacity(0.06)
+            shape.fill(theme.accent.opacity(0.06))
         } else {
             Color.clear
         }

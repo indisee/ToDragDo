@@ -18,6 +18,12 @@ final class PanelState {
         }
     }
     var expandedItemId: UUID? = nil
+    /// When true, `ItemRow` treats every row as expanded regardless of
+    /// `expandedItemId`. Used by the Done-summary window's Open/Closed
+    /// segment to flip the whole sheet between compact and full views.
+    /// Left at `false` in the floating panel's PanelState — only the
+    /// summary window flips this on.
+    var allExpanded: Bool = false
     var inputDraft: String = ""
     var pendingAttachments: [Attachment] = []
     var isListCollapsed: Bool = false
