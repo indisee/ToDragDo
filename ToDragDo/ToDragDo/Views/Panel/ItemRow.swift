@@ -114,7 +114,8 @@ struct ItemRow: View {
         contentLine
             .padding(.leading, 22)
             .padding(.trailing, 16)
-            .padding(.vertical, 4)
+            .padding(.top, isExpanded ? 8 : 4)
+            .padding(.bottom, 4)
             .frame(minHeight: 32, alignment: isExpanded ? .top : .center)
     }
 
@@ -137,7 +138,7 @@ struct ItemRow: View {
                 style: .dot
             )
             .padding(.leading, 12)
-            .padding(.top, isExpanded ? 10 : 14)
+            .padding(.top, 14)
         }
     }
 
@@ -163,7 +164,7 @@ struct ItemRow: View {
     /// between text and attachments so it stays visible when the note
     /// truncates from the right.
     private var contentLine: some View {
-        HStack(alignment: isExpanded ? .top : .center, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             noteText
             if item.folder == .done {
                 AttachmentIconStrip(attachments: payload.attachments)

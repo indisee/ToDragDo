@@ -81,7 +81,7 @@ struct SummaryItemRow: View {
     }
 
     private var contentLine: some View {
-        HStack(alignment: isExpanded ? .top : .center, spacing: 8) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             noteText
             AttachmentIconStrip(attachments: payload.attachments)
                 .frame(height: theme.rowHeight)
@@ -95,8 +95,7 @@ struct SummaryItemRow: View {
                 .font(.system(size: theme.bodySize))
                 .textSelection(.enabled)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(maxWidth: .infinity, minHeight: theme.rowHeight, alignment: .topLeading)
-                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, minHeight: theme.rowHeight, alignment: .leading)
                 .layoutPriority(1)
         } else {
             Text(attributedDisplay)
@@ -115,6 +114,7 @@ struct SummaryItemRow: View {
             }
         }
         .padding(.horizontal, 10)
+        .padding(.top, 6)
         .padding(.bottom, 8)
     }
 
