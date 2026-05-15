@@ -15,9 +15,10 @@ final class PersistedItem {
     var lastEditedBy: String = ""
     var dueDate: Date?
     var completedAt: Date?
-    /// Defaulted so existing rows lightweight-migrate to Work without
-    /// schema surgery. Stays in sync with `Item.projectId`.
-    var projectId: UUID = Project.workId
+    /// Optional — `nil` means the item is unassigned. Existing rows that
+    /// stored `Project.workId` keep that value through lightweight
+    /// migration; the user can clear them via the per-row picker.
+    var projectId: UUID?
     var limboEnteredAt: Date?
 
     init(from dto: Item) {

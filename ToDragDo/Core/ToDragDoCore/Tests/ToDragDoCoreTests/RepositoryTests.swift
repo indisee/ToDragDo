@@ -212,7 +212,7 @@ struct RepositoryTests {
         #expect(order == [b.id, a.id])
     }
 
-    @Test("resyncAllItems appends a fresh outbox row per item, marked pending for the provider")
+    @Test("resyncAllItems appends a fresh outbox row per item and project, marked pending for the provider")
     func resyncAllItemsAppendsPendingRows() async throws {
         let (repo, storage) = makeSUT()
 
@@ -220,6 +220,9 @@ struct RepositoryTests {
         let alsoLive = try await repo.add(folder: .libmo, typeIdentifier: "t", payload: Data("b".utf8))
         let toDelete = try await repo.add(folder: .today, typeIdentifier: "t", payload: Data("c".utf8))
         try await repo.softDelete(id: toDelete.id)
+
+        let seededProjects = repo.projects
+        #expect(seededProjects.count == 2)
 
         // Simulate that the existing outbox is fully pushed to the
         // provider — this is the state right after switching env, where
@@ -230,21 +233,26 @@ struct RepositoryTests {
         #expect(try await repo.pendingPushCount(for: Self.provider) == 0)
 
         let count = try await repo.resyncAllItems()
-        #expect(count == 3)
+        // 3 items + 2 seeded projects
+        #expect(count == 5)
 
         let pending = try await repo.pendingChanges(for: Self.provider)
-        #expect(pending.count == 3)
+        #expect(pending.count == 5)
 
-        let opsByEntity = Dictionary(uniqueKeysWithValues: pending.map { ($0.entityId, $0.op) })
+        let itemPending = pending.filter { $0.entityType == "Item" }
+        let projectPending = pending.filter { $0.entityType == "Project" }
+        #expect(itemPending.count == 3)
+        #expect(projectPending.count == 2)
+
+        let opsByEntity = Dictionary(uniqueKeysWithValues: itemPending.map { ($0.entityId, $0.op) })
         #expect(opsByEntity[live.id] == .update)
         #expect(opsByEntity[alsoLive.id] == .update)
         #expect(opsByEntity[toDelete.id] == .softDelete)
 
-        // Each snapshot decodes back to a current-state Item with the
-        // right id and (for the deleted one) deletedAt populated.
+        // Item snapshots decode back to current-state Items.
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        for change in pending {
+        for change in itemPending {
             let decoded = try decoder.decode(Item.self, from: change.snapshot)
             #expect(decoded.id == change.entityId)
             if change.entityId == toDelete.id {
@@ -252,6 +260,15 @@ struct RepositoryTests {
             } else {
                 #expect(decoded.deletedAt == nil)
             }
+        }
+
+        // Project snapshots decode back to current-state Projects.
+        let projectIds = Set(seededProjects.map(\.id))
+        for change in projectPending {
+            #expect(change.op == .update)
+            #expect(projectIds.contains(change.entityId))
+            let decoded = try decoder.decode(Project.self, from: change.snapshot)
+            #expect(decoded.id == change.entityId)
         }
 
         // The local item table is unchanged — resync only touches the outbox.

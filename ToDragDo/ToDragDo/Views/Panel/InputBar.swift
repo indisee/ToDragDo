@@ -91,6 +91,10 @@ struct InputBar: View {
     /// (committed alongside the note on Return); add mode mutates
     /// `inputProjectId`. Either way the badge change is pure UI — no
     /// repository write, no CloudKit push — until submit.
+    ///
+    /// New items default to the first available project rather than
+    /// "no project" — the unassigned state is a deletion fallback, not
+    /// something the user picks while creating a row.
     private var badgeBehavior: ProjectBadge.Behavior {
         if panelState.editingItemId != nil {
             return .single(
@@ -100,7 +104,7 @@ struct InputBar: View {
             )
         }
         return .single(
-            current: panelState.inputProjectId,
+            current: panelState.inputProjectId ?? repository.projects.first?.id,
             allowFlip: true,
             onPick: { panelState.inputProjectId = $0 }
         )
@@ -139,7 +143,7 @@ struct InputBar: View {
                     if let data = try? payload.encoded() {
                         item.payload = data
                     }
-                    if let projectId, projectId != item.projectId {
+                    if projectId != item.projectId {
                         item.projectId = projectId
                     }
                 }
@@ -159,7 +163,7 @@ struct InputBar: View {
                 folder: panelState.selectedFolder,
                 typeIdentifier: typeIdentifier,
                 payload: try payload.encoded(),
-                projectId: panelState.inputProjectId
+                projectId: panelState.inputProjectId ?? repository.projects.first?.id
             )
             panelState.inputDraft = ""
             panelState.pendingAttachments = []

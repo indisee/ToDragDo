@@ -22,11 +22,15 @@ struct ProjectBadge: View {
 
     /// What the badge represents and how taps mutate it.
     enum Behavior {
-        /// Single-value pick. `allowFlip` enables the two-projects
-        /// one-tap-swap shortcut used by the input bar.
+        /// Single-value pick. `current == nil` is a fallback display
+        /// state (the item's project was deleted) — the popover never
+        /// offers "No Project" as a selectable row, so `onPick` only
+        /// fires with real project ids. `allowFlip` enables the
+        /// two-projects one-tap-swap shortcut used by the input bar.
         case single(current: UUID?, allowFlip: Bool, onPick: (UUID) -> Void)
         /// Multi-value pick used by the list filter. Empty set = "All".
-        case multi(selected: Set<UUID>, onToggle: (UUID) -> Void, onAll: () -> Void)
+        /// `.none` in the set matches unassigned items.
+        case multi(selected: Set<UUID?>, onToggle: (UUID?) -> Void, onAll: () -> Void)
     }
 
     @Environment(Repository.self) private var repository
@@ -61,7 +65,7 @@ struct ProjectBadge: View {
         switch behavior {
         case let .single(current, allowFlip, onPick):
             let projects = repository.projects
-            if allowFlip, projects.count == 2,
+            if allowFlip, projects.count == 2, current != nil,
                let other = projects.first(where: { $0.id != current }) {
                 onPick(other.id)
                 return
@@ -79,13 +83,13 @@ struct ProjectBadge: View {
     private var tooltip: String {
         switch behavior {
         case let .single(current, _, _):
-            guard let current else { return "Select project" }
-            return repository.project(for: current).name
+            return repository.project(for: current)?.name ?? "No Project"
         case let .multi(selected, _, _):
             if selected.isEmpty { return "All Projects" }
-            let names = repository.projects
+            var names = repository.projects
                 .filter { selected.contains($0.id) }
                 .map(\.name)
+            if selected.contains(nil) { names.insert("No Project", at: 0) }
             return names.joined(separator: ", ")
         }
     }
@@ -163,14 +167,13 @@ struct ProjectBadge: View {
     private var primaryColor: Color {
         switch behavior {
         case let .single(current, _, _):
-            guard let current else { return .gray }
-            return repository.project(for: current).color
+            return repository.project(for: current)?.color ?? .gray
         case let .multi(selected, _, _):
             // "All" and "more than one" both render gray — the chip
             // only reflects a project's color when exactly one is
             // selected and the picker collapses to a single value.
             if selected.count == 1, let id = selected.first {
-                return repository.project(for: id).color
+                return repository.project(for: id)?.color ?? .gray
             }
             return .gray
         }
@@ -179,12 +182,13 @@ struct ProjectBadge: View {
     private var primaryName: String {
         switch behavior {
         case let .single(current, _, _):
-            guard let current else { return "Select" }
-            return repository.project(for: current).name
+            if current == nil { return "No Project" }
+            return repository.project(for: current)?.name ?? "No Project"
         case let .multi(selected, _, _):
             if selected.isEmpty { return "All" }
-            if selected.count == 1, let id = selected.first {
-                return repository.project(for: id).name
+            if selected.count == 1, let entry = selected.first {
+                if entry == nil { return "No Project" }
+                return repository.project(for: entry)?.name ?? "No Project"
             }
             return "\(selected.count) projects"
         }
@@ -205,6 +209,8 @@ private struct ProjectPickerPopover: View {
             if case .multi = behavior {
                 allRow
                 Divider().opacity(0.4)
+                noProjectRow
+                Divider().opacity(0.4)
             }
             ForEach(repository.projects) { project in
                 row(for: project)
@@ -218,6 +224,36 @@ private struct ProjectPickerPopover: View {
         // Suppress the macOS keyboard-focus ring that would otherwise
         // land on the first row when the popover opens.
         .focusEffectDisabled()
+    }
+
+    /// Toggle the unassigned-items bucket in the filter. Only rendered
+    /// in `.multi` mode — "no project" is a fallback state for items
+    /// whose project was deleted, never something the user picks
+    /// explicitly when assigning a project.
+    @ViewBuilder
+    private var noProjectRow: some View {
+        let isSelected: Bool = {
+            if case let .multi(set, _, _) = behavior { return set.contains(nil) }
+            return false
+        }()
+        Button {
+            if case let .multi(_, onToggle, _) = behavior {
+                onToggle(nil)
+            }
+        } label: {
+            HStack(spacing: 8) {
+                checkmark(visible: isSelected)
+                Circle()
+                    .strokeBorder(.secondary.opacity(0.6), lineWidth: 1)
+                    .frame(width: 12, height: 12)
+                Text("No Project")
+                    .font(.system(size: 12))
+                    .foregroundStyle(.primary)
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(RowButtonStyle())
     }
 
     @ViewBuilder

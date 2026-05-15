@@ -68,15 +68,44 @@ public protocol ItemStorage: Sendable {
     /// All projects sorted by `orderKey` ascending.
     func projects() async throws -> [Project]
 
-    /// Inserts or updates a project row. No outbox row — project entities
-    /// aren't synced (yet); items reference projects by id, and unknown
-    /// ids resolve to Work at the Repository layer.
+    /// All items (active + soft-deleted) currently assigned to `projectId`.
+    /// Used when a project is being deleted so the caller can build
+    /// per-item outbox rows for the cascade-clear.
+    func itemsAssigned(toProjectId projectId: UUID) async throws -> [Item]
+
+    /// Inserts or updates a project row without emitting an outbox row.
+    /// Used only by the first-launch seed path — every device runs the
+    /// same seed independently, so emitting outbox rows would just churn
+    /// CloudKit with duplicates.
     func upsertProject(_ project: Project) async throws
 
-    /// Removes a project row. Items previously assigned to it are
-    /// reassigned to `reassignTo` in the same transaction. The two ids
-    /// must differ.
-    func deleteProject(id: UUID, reassignTo: UUID) async throws
+    /// Inserts or updates a project row AND appends `change` to the
+    /// outbox in the same transaction. Used by user-initiated writes.
+    func upsertProject(_ project: Project, change: ChangeRecord) async throws
+
+    /// Removes a project row, clears `projectId` on the supplied
+    /// `clearedItems`, and appends `change` + `itemChanges` to the
+    /// outbox — all in one transaction. The caller is responsible for
+    /// computing `clearedItems` (via `itemsAssigned(toProjectId:)`) and
+    /// building the matching change rows.
+    func deleteProject(
+        id: UUID,
+        change: ChangeRecord,
+        clearedItems: [Item],
+        itemChanges: [ChangeRecord]
+    ) async throws
+
+    /// Remote-originated project upsert; no outbox row. LWW on
+    /// `updatedAt`: if the local row's `updatedAt >= project.updatedAt`,
+    /// the incoming write is dropped.
+    func upsertProjectWithoutChange(_ project: Project) async throws
+
+    /// Remote-originated project hardDelete; no outbox row. Always
+    /// wins. Items still locally referencing the project are left
+    /// alone — their `projectId` will be cleared once their own remote
+    /// update arrives (the source device emits item updates alongside
+    /// the project delete).
+    func deleteProjectWithoutChange(id: UUID) async throws
 }
 
 public enum StorageError: Error, Sendable, Equatable {

@@ -68,15 +68,12 @@ public final class Repository: RemoteApplier {
         projects = stored
     }
 
-    /// Resolves `id` to a known project, falling back to Work for unknown
-    /// ids (e.g. items pulled from a device that hasn't synced its
-    /// project list yet).
-    public func project(for id: UUID) -> Project {
-        if let match = projects.first(where: { $0.id == id }) {
-            return match
-        }
-        return projects.first(where: { $0.id == Project.workId })
-            ?? Project.defaultWork()
+    /// Resolves `id` to a known project. Returns `nil` for unassigned
+    /// items (`id == nil`) or unknown ids (project row hasn't been
+    /// pulled yet, or has been deleted elsewhere).
+    public func project(for id: UUID?) -> Project? {
+        guard let id else { return nil }
+        return projects.first(where: { $0.id == id })
     }
 
     /// `reload()` + fire `onWriteCallback`. Used by every user-initiated
@@ -93,7 +90,7 @@ public final class Repository: RemoteApplier {
         folder: Folder,
         typeIdentifier: String,
         payload: Data,
-        projectId: UUID = Project.workId
+        projectId: UUID? = nil
     ) async throws -> Item {
         // New items prepend to the folder so the user sees them
         // immediately without scrolling/paging — orderKey one tick
@@ -114,9 +111,9 @@ public final class Repository: RemoteApplier {
         return item
     }
 
-    /// Reassign an existing item to a different project. No-op if the
-    /// project already matches.
-    public func setProject(itemId: UUID, to projectId: UUID) async throws {
+    /// Reassign an existing item to a different project, or `nil` to
+    /// clear it. No-op if the project already matches.
+    public func setProject(itemId: UUID, to projectId: UUID?) async throws {
         guard var item = try await storage.item(id: itemId) else {
             throw StorageError.notFound(itemId)
         }
@@ -137,8 +134,9 @@ public final class Repository: RemoteApplier {
     public func addProject(name: String, colorHex: String) async throws -> Project {
         let nextKey = (projects.map(\.orderKey).max() ?? 0) + 1
         let project = Project(name: name, colorHex: colorHex, orderKey: nextKey)
-        try await storage.upsertProject(project)
-        try await reload()
+        let change = makeProjectChange(op: .insert, project: project)
+        try await storage.upsertProject(project, change: change)
+        try await reloadAndNotify()
         return project
     }
 
@@ -146,24 +144,46 @@ public final class Repository: RemoteApplier {
         guard var project = projects.first(where: { $0.id == id }) else { return }
         project.name = name
         project.updatedAt = .now
-        try await storage.upsertProject(project)
-        try await reload()
+        let change = makeProjectChange(op: .update, project: project)
+        try await storage.upsertProject(project, change: change)
+        try await reloadAndNotify()
     }
 
     public func recolorProject(id: UUID, to colorHex: String) async throws {
         guard var project = projects.first(where: { $0.id == id }) else { return }
         project.colorHex = colorHex
         project.updatedAt = .now
-        try await storage.upsertProject(project)
-        try await reload()
+        let change = makeProjectChange(op: .update, project: project)
+        try await storage.upsertProject(project, change: change)
+        try await reloadAndNotify()
     }
 
-    /// Delete a custom project. Items assigned to it are reassigned to
-    /// `reassignTo` (default: Work). Refuses to delete the seed Work
-    /// project — it's the system-wide migration fallback.
-    public func deleteProject(id: UUID, reassignTo: UUID = Project.workId) async throws {
-        guard id != Project.workId else { return }
-        try await storage.deleteProject(id: id, reassignTo: reassignTo)
+    /// Delete a project. Items previously assigned to it are cleared
+    /// (their `projectId` becomes `nil`) and each emits its own update
+    /// change record so the cascade propagates through sync without
+    /// the receiver having to repeat the lookup.
+    public func deleteProject(id: UUID) async throws {
+        guard let project = projects.first(where: { $0.id == id }) else { return }
+        let now = Date.now
+        let affected = try await storage.itemsAssigned(toProjectId: id)
+        var cleared: [Item] = []
+        var itemChanges: [ChangeRecord] = []
+        cleared.reserveCapacity(affected.count)
+        itemChanges.reserveCapacity(affected.count)
+        for var item in affected {
+            item.projectId = nil
+            item.updatedAt = now
+            item.lastEditedBy = deviceId
+            cleared.append(item)
+            itemChanges.append(makeChange(op: .update, item: item))
+        }
+        let projectChange = makeProjectChange(op: .hardDelete, project: project)
+        try await storage.deleteProject(
+            id: id,
+            change: projectChange,
+            clearedItems: cleared,
+            itemChanges: itemChanges
+        )
         try await reloadAndNotify()
     }
 
@@ -503,16 +523,11 @@ public final class Repository: RemoteApplier {
     public func applyRemote(_ records: [ChangeRecord]) async throws {
         var changed = false
         for record in records where record.deviceId != deviceId {
-            switch record.op {
-            case .insert, .update:
-                let item = try decoder.decode(Item.self, from: record.snapshot)
-                try await storage.upsertWithoutChange(item)
-            case .softDelete:
-                let item = try? decoder.decode(Item.self, from: record.snapshot)
-                let at = item?.deletedAt ?? record.ts
-                try await storage.softDeleteWithoutChange(id: record.entityId, at: at)
-            case .hardDelete:
-                try await storage.hardDeleteWithoutChange(id: record.entityId)
+            switch record.entityType {
+            case "Project":
+                try await applyRemoteProject(record)
+            default:
+                try await applyRemoteItem(record)
             }
             changed = true
         }
@@ -521,6 +536,34 @@ public final class Repository: RemoteApplier {
             // we don't recursively trigger another sync round on records
             // that came *from* the remote.
             try await reload()
+        }
+    }
+
+    private func applyRemoteItem(_ record: ChangeRecord) async throws {
+        switch record.op {
+        case .insert, .update:
+            let item = try decoder.decode(Item.self, from: record.snapshot)
+            try await storage.upsertWithoutChange(item)
+        case .softDelete:
+            let item = try? decoder.decode(Item.self, from: record.snapshot)
+            let at = item?.deletedAt ?? record.ts
+            try await storage.softDeleteWithoutChange(id: record.entityId, at: at)
+        case .hardDelete:
+            try await storage.hardDeleteWithoutChange(id: record.entityId)
+        }
+    }
+
+    private func applyRemoteProject(_ record: ChangeRecord) async throws {
+        switch record.op {
+        case .insert, .update:
+            let project = try decoder.decode(Project.self, from: record.snapshot)
+            try await storage.upsertProjectWithoutChange(project)
+        case .hardDelete:
+            try await storage.deleteProjectWithoutChange(id: record.entityId)
+        case .softDelete:
+            // Projects don't soft-delete — drop the record instead of
+            // throwing so a stray legacy/future op doesn't break the pull.
+            return
         }
     }
 
@@ -537,19 +580,33 @@ public final class Repository: RemoteApplier {
     @discardableResult
     public func resyncAllItems() async throws -> Int {
         let allItems = try await storage.allItems()
-        guard !allItems.isEmpty else { return 0 }
+        let allProjects = try await storage.projects()
+        guard !allItems.isEmpty || !allProjects.isEmpty else { return 0 }
         let now = Date()
-        let changes: [ChangeRecord] = allItems.map { item in
+        var changes: [ChangeRecord] = []
+        changes.reserveCapacity(allItems.count + allProjects.count)
+        for item in allItems {
             let op: ChangeOp = item.deletedAt != nil ? .softDelete : .update
             let snapshot = (try? encoder.encode(item)) ?? Data()
-            return ChangeRecord(
+            changes.append(ChangeRecord(
                 entityType: "Item",
                 entityId: item.id,
                 op: op,
                 snapshot: snapshot,
                 deviceId: deviceId,
                 ts: now
-            )
+            ))
+        }
+        for project in allProjects {
+            let snapshot = (try? encoder.encode(project)) ?? Data()
+            changes.append(ChangeRecord(
+                entityType: "Project",
+                entityId: project.id,
+                op: .update,
+                snapshot: snapshot,
+                deviceId: deviceId,
+                ts: now
+            ))
         }
         try await storage.appendChanges(changes)
         onWriteCallback?()
@@ -561,6 +618,17 @@ public final class Repository: RemoteApplier {
         return ChangeRecord(
             entityType: "Item",
             entityId: item.id,
+            op: op,
+            snapshot: snapshot,
+            deviceId: deviceId
+        )
+    }
+
+    private func makeProjectChange(op: ChangeOp, project: Project) -> ChangeRecord {
+        let snapshot = (try? encoder.encode(project)) ?? Data()
+        return ChangeRecord(
+            entityType: "Project",
+            entityId: project.id,
             op: op,
             snapshot: snapshot,
             deviceId: deviceId

@@ -280,9 +280,52 @@ public final class SwiftDataStorage: ItemStorage {
         return try ctx.fetch(descriptor).map { $0.toDTO() }
     }
 
+    public func itemsAssigned(toProjectId projectId: UUID) async throws -> [Item] {
+        let descriptor = FetchDescriptor<PersistedItem>(
+            predicate: #Predicate { $0.projectId == projectId }
+        )
+        return try ctx.fetch(descriptor).map { $0.toDTO() }
+    }
+
     public func upsertProject(_ project: Project) async throws {
         try ctx.transaction {
+            try upsertProjectInline(project)
+        }
+    }
+
+    public func upsertProject(_ project: Project, change: ChangeRecord) async throws {
+        try ctx.transaction {
+            try upsertProjectInline(project)
+            ctx.insert(PersistedChange(from: change))
+        }
+    }
+
+    public func deleteProject(
+        id: UUID,
+        change: ChangeRecord,
+        clearedItems: [Item],
+        itemChanges: [ChangeRecord]
+    ) async throws {
+        try ctx.transaction {
+            for item in clearedItems {
+                if let row = try fetchPersistedItem(id: item.id) {
+                    row.apply(item)
+                }
+            }
+            if let row = try fetchPersistedProject(id: id) {
+                ctx.delete(row)
+            }
+            for itemChange in itemChanges {
+                ctx.insert(PersistedChange(from: itemChange))
+            }
+            ctx.insert(PersistedChange(from: change))
+        }
+    }
+
+    public func upsertProjectWithoutChange(_ project: Project) async throws {
+        try ctx.transaction {
             if let existing = try fetchPersistedProject(id: project.id) {
+                if existing.updatedAt >= project.updatedAt { return }
                 existing.apply(project)
             } else {
                 ctx.insert(PersistedProject(from: project))
@@ -290,19 +333,19 @@ public final class SwiftDataStorage: ItemStorage {
         }
     }
 
-    public func deleteProject(id: UUID, reassignTo: UUID) async throws {
-        guard id != reassignTo else { return }
+    public func deleteProjectWithoutChange(id: UUID) async throws {
         try ctx.transaction {
-            let descriptor = FetchDescriptor<PersistedItem>(
-                predicate: #Predicate { $0.projectId == id }
-            )
-            for row in try ctx.fetch(descriptor) {
-                row.projectId = reassignTo
-                row.updatedAt = .now
-            }
             if let row = try fetchPersistedProject(id: id) {
                 ctx.delete(row)
             }
+        }
+    }
+
+    private func upsertProjectInline(_ project: Project) throws {
+        if let existing = try fetchPersistedProject(id: project.id) {
+            existing.apply(project)
+        } else {
+            ctx.insert(PersistedProject(from: project))
         }
     }
 

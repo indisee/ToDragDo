@@ -1,13 +1,13 @@
 import Foundation
 
-/// A user-defined grouping that every `Item` belongs to. Independent of
+/// A user-defined grouping an `Item` can belong to. Independent of
 /// `Folder` (which is a timing/state bucket): a "Buy milk" item can be
-/// in Today × Personal, while "Ship feature" is in Today × Work.
+/// in Today × Personal, while "Ship feature" is in Today × Work. The
+/// assignment is optional — items can also live without a project.
 ///
-/// Two seed projects (Work, Personal) exist on every device with fixed
-/// UUIDs so the migration path — and any device that hasn't created
-/// custom projects yet — converges on the same defaults without needing
-/// to round-trip project rows through sync.
+/// Two seed projects (Work, Personal) are inserted on first launch with
+/// fixed UUIDs so every device starts from the same defaults without
+/// needing to round-trip project rows through sync.
 public struct Project: Identifiable, Sendable, Codable, Hashable {
     public let id: UUID
     public var name: String
@@ -37,8 +37,8 @@ public struct Project: Identifiable, Sendable, Codable, Hashable {
 
     // MARK: - Defaults
 
-    /// Stable UUID for the seed "Work" project. Used as the migration
-    /// fallback when an existing item has no project assigned.
+    /// Stable UUID for the seed "Work" project. Same id across devices
+    /// so the first-launch defaults converge without sync.
     public static let workId = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
     /// Stable UUID for the seed "Personal" project.
     public static let personalId = UUID(uuidString: "22222222-2222-2222-2222-222222222222")!
@@ -49,12 +49,22 @@ public struct Project: Identifiable, Sendable, Codable, Hashable {
     /// System green; matches the design palette.
     public static let personalColorHex = "#34C759"
 
+    /// Fixed timestamp stamped on seeded defaults across every device.
+    /// `Date.distantPast` so any user-initiated edit (which uses
+    /// `Date.now`) is unambiguously newer in the LWW comparison — the
+    /// seeded row never spuriously wins against an incoming recolor
+    /// just because that device happened to seed more recently than
+    /// the other device's edit.
+    private static let seedTimestamp: Date = .distantPast
+
     public static func defaultWork() -> Project {
         Project(
             id: workId,
             name: "Work",
             colorHex: workColorHex,
-            orderKey: 1
+            orderKey: 1,
+            createdAt: seedTimestamp,
+            updatedAt: seedTimestamp
         )
     }
 
@@ -63,7 +73,9 @@ public struct Project: Identifiable, Sendable, Codable, Hashable {
             id: personalId,
             name: "Personal",
             colorHex: personalColorHex,
-            orderKey: 2
+            orderKey: 2,
+            createdAt: seedTimestamp,
+            updatedAt: seedTimestamp
         )
     }
 

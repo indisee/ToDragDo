@@ -10,11 +10,10 @@ public struct Item: Identifiable, Sendable, Codable, Hashable {
     public var updatedAt: Date
     public var deletedAt: Date?
     public var lastEditedBy: String
-    /// Project this item belongs to. Always set: items pre-dating the
-    /// project concept (and any incoming records that reference an
-    /// unknown project) fall back to `Project.workId` at the storage
-    /// boundary.
-    public var projectId: UUID
+    /// Project this item belongs to, or `nil` for unassigned items.
+    /// Unknown ids coming in from sync resolve to `nil` (the project
+    /// row hasn't been pulled yet or has been deleted elsewhere).
+    public var projectId: UUID?
     /// Optional calendar day the user wants to act on this item. Items
     /// with a future `dueDate` live in Limbo until their day arrives;
     /// items whose day is today or earlier sit in Today (with past-due
@@ -44,7 +43,7 @@ public struct Item: Identifiable, Sendable, Codable, Hashable {
         updatedAt: Date = .now,
         deletedAt: Date? = nil,
         lastEditedBy: String,
-        projectId: UUID = Project.workId,
+        projectId: UUID? = nil,
         dueDate: Date? = nil,
         completedAt: Date? = nil,
         limboEnteredAt: Date? = nil
@@ -81,10 +80,7 @@ public struct Item: Identifiable, Sendable, Codable, Hashable {
         self.updatedAt = try c.decode(Date.self, forKey: .updatedAt)
         self.deletedAt = try c.decodeIfPresent(Date.self, forKey: .deletedAt)
         self.lastEditedBy = try c.decode(String.self, forKey: .lastEditedBy)
-        // Older snapshots (and any remote record from a device that
-        // hasn't shipped the Project field yet) decode to Work — the
-        // migration default.
-        self.projectId = try c.decodeIfPresent(UUID.self, forKey: .projectId) ?? Project.workId
+        self.projectId = try c.decodeIfPresent(UUID.self, forKey: .projectId)
         self.dueDate = try c.decodeIfPresent(Date.self, forKey: .dueDate)
         self.completedAt = try c.decodeIfPresent(Date.self, forKey: .completedAt)
         self.limboEnteredAt = try c.decodeIfPresent(Date.self, forKey: .limboEnteredAt)

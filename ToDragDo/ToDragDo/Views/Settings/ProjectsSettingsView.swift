@@ -3,9 +3,9 @@ import ToDragDoCore
 
 /// Projects pane in the Settings scene.
 ///
-/// Lets the user rename and recolor any project, add new ones, and
-/// delete custom projects (the seed Work project is undeletable — it's
-/// the migration fallback for orphaned items).
+/// Lets the user rename, recolor, add, and delete projects. Deleting a
+/// project clears its items' assignments (they show up under "No
+/// Project" in the filter).
 struct ProjectsSettingsView: View {
     @Environment(Repository.self) private var repository
 
@@ -123,15 +123,13 @@ private struct ProjectRow: View {
 
             Spacer(minLength: 0)
 
-            if project.id != Project.workId {
-                Button(role: .destructive) {
-                    onAction(.delete)
-                } label: {
-                    Image(systemName: "trash")
-                }
-                .buttonStyle(.borderless)
-                .help("Delete (items move to Work)")
+            Button(role: .destructive) {
+                onAction(.delete)
+            } label: {
+                Image(systemName: "trash")
             }
+            .buttonStyle(.borderless)
+            .help("Delete (items become unassigned)")
         }
         .onChange(of: project.colorHex) { _, new in
             if new != colorHex { colorHex = new }

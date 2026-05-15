@@ -138,17 +138,41 @@ actor InMemoryItemStorage: ItemStorage {
         projectStore.values.sorted { $0.orderKey < $1.orderKey }
     }
 
+    func itemsAssigned(toProjectId projectId: UUID) async throws -> [Item] {
+        items.values.filter { $0.projectId == projectId }
+    }
+
     func upsertProject(_ project: Project) async throws {
         projectStore[project.id] = project
     }
 
-    func deleteProject(id: UUID, reassignTo: UUID) async throws {
-        guard id != reassignTo else { return }
-        for (itemId, var item) in items where item.projectId == id {
-            item.projectId = reassignTo
-            item.updatedAt = .now
-            items[itemId] = item
+    func upsertProject(_ project: Project, change: ChangeRecord) async throws {
+        projectStore[project.id] = project
+        changes[change.id] = change
+    }
+
+    func deleteProject(
+        id: UUID,
+        change: ChangeRecord,
+        clearedItems: [Item],
+        itemChanges: [ChangeRecord]
+    ) async throws {
+        for item in clearedItems {
+            items[item.id] = item
         }
+        projectStore.removeValue(forKey: id)
+        for itemChange in itemChanges {
+            changes[itemChange.id] = itemChange
+        }
+        changes[change.id] = change
+    }
+
+    func upsertProjectWithoutChange(_ project: Project) async throws {
+        if let existing = projectStore[project.id], existing.updatedAt >= project.updatedAt { return }
+        projectStore[project.id] = project
+    }
+
+    func deleteProjectWithoutChange(id: UUID) async throws {
         projectStore.removeValue(forKey: id)
     }
 

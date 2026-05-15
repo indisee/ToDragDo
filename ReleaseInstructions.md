@@ -98,8 +98,8 @@ Options, in order of effort:
   open **Settings → Sync**, and click **Re-sync All…** on the iCloud
   row. This calls `Repository.resyncAllItems()`, which appends a fresh
   current-state outbox row for every local item (including soft-deleted
-  ones) so the next sync cycle pushes everything to the new
-  environment. Items themselves are not modified; only the outbox grows.
+  ones) and every project so the next sync cycle pushes everything to
+  the new environment. Local rows are not modified; only the outbox grows.
   Run this on each Mac after the cutover.
 - **Manual replay via CK Console.** Possible but tedious — the snapshot
   payload is a JSON `CKAsset`, not a flat field. Not recommended.
