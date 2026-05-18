@@ -58,14 +58,16 @@ struct FolderTab: View {
             .accessibilityLabel(folder.displayName)
 
         if blinkBadge {
-            label.background {
-                Capsule()
-                    .fill(Color.red)
-                    .phaseAnimator([0.55, 1.0]) { content, opacity in
-                        content.opacity(opacity)
-                    } animation: { _ in
-                        .easeInOut(duration: 0.7)
-                    }
+            // TimelineView drives a continuous sin-based opacity so the
+            // entry frame matches the steady-state value — phaseAnimator
+            // ran an `.easeInOut` from a zero starting state when the
+            // row was inserted, which read as the red shape "sliding in
+            // from somewhere" on folder open.
+            TimelineView(.animation) { ctx in
+                let phase = pulsePhase(at: ctx.date)
+                label
+                    .background(Color.red, in: Capsule())
+                    .opacity(0.78 + 0.22 * phase)
             }
         } else if isSelected {
             label.background(theme.accent, in: Capsule())
@@ -93,6 +95,15 @@ struct FolderTab: View {
         }
         return true
     }
+}
+
+/// 0…1 sine phase with a 0.55s full cycle. Shared between the badge
+/// and the row wash so both heartbeats tick in lockstep.
+@inline(__always)
+func pulsePhase(at date: Date) -> Double {
+    let period: Double = 0.55
+    let t = date.timeIntervalSinceReferenceDate
+    return (sin(t * 2 * .pi / period) + 1) / 2
 }
 
 private extension Folder {

@@ -28,6 +28,7 @@ struct ToDragDoApp: App {
         Self.logOutcome(outcome)
         let repository = Repository(storage: storage)
         let settings = AppSettings()
+        settings.bindToSync(repository)
         let coordinator = SyncCoordinator(applier: repository)
         let cloudAdapter = CloudKitRemoteAdapter(
             containerIdentifier: Self.iCloudContainerIdentifier

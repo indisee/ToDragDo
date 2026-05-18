@@ -29,6 +29,15 @@ public final class Repository: RemoteApplier {
     @ObservationIgnored
     public var onWriteCallback: (@MainActor () -> Void)?
 
+    /// Fires when a `SettingsSnapshot` arrives via `applyRemote`. The
+    /// host (`AppSettings`) decides whether the incoming snapshot's `ts`
+    /// is newer than the locally-applied value and applies it if so —
+    /// the Repository carries the bytes but doesn't own the merge
+    /// policy because local persistence (UserDefaults) lives in the app
+    /// layer.
+    @ObservationIgnored
+    public var onRemoteSettings: (@MainActor (SettingsSnapshot, Date) -> Void)?
+
     public init(storage: any ItemStorage, deviceId: String = DeviceID.current) {
         self.storage = storage
         self.deviceId = deviceId
@@ -526,6 +535,11 @@ public final class Repository: RemoteApplier {
             switch record.entityType {
             case "Project":
                 try await applyRemoteProject(record)
+            case SettingsSnapshot.entityType:
+                applyRemoteSettings(record)
+                // Settings don't touch the items table — skip the reload
+                // they don't need by not flipping `changed`.
+                continue
             default:
                 try await applyRemoteItem(record)
             }
@@ -537,6 +551,33 @@ public final class Repository: RemoteApplier {
             // that came *from* the remote.
             try await reload()
         }
+    }
+
+    private func applyRemoteSettings(_ record: ChangeRecord) {
+        guard let snapshot = try? decoder.decode(SettingsSnapshot.self, from: record.snapshot)
+        else { return }
+        onRemoteSettings?(snapshot, record.ts)
+    }
+
+    /// Append a Settings change record to the outbox. The local value
+    /// is owned by the app (UserDefaults) — Repository only carries
+    /// the snapshot through the same change-record pipe that already
+    /// moves `Item` and `Project` rows.
+    public func emitSettingsChange(
+        _ snapshot: SettingsSnapshot,
+        at ts: Date = .now
+    ) async throws {
+        let data = (try? encoder.encode(snapshot)) ?? Data()
+        let change = ChangeRecord(
+            entityType: SettingsSnapshot.entityType,
+            entityId: SettingsSnapshot.entityId,
+            op: .update,
+            snapshot: data,
+            deviceId: deviceId,
+            ts: ts
+        )
+        try await storage.appendChanges([change])
+        onWriteCallback?()
     }
 
     private func applyRemoteItem(_ record: ChangeRecord) async throws {

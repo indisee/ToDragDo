@@ -344,18 +344,20 @@ struct ItemRow: View {
         let shape = RoundedRectangle(cornerRadius: 6)
         if isStaleInLimbo {
             // Pulsing red wash signals "this has sat in Limbo too long".
-            // Layered under any hover tint so the warning still shows
-            // when the cursor isn't over the row.
-            shape
-                .fill(.red)
-                .phaseAnimator([0.06, 0.22]) { content, opacity in
-                    content.opacity(opacity)
-                } animation: { _ in
-                    .easeInOut(duration: 0.7)
-                }
-                .overlay {
-                    if isHovered { shape.fill(theme.accent.opacity(0.06)) }
-                }
+            // TimelineView drives a continuous sin-based opacity so the
+            // initial frame already sits at its steady-state value —
+            // phaseAnimator was running an `.easeInOut` from a zero
+            // starting state when the row was inserted, which read as
+            // the red shape "moving in from somewhere" on folder open.
+            TimelineView(.animation) { ctx in
+                let phase = pulsePhase(at: ctx.date)
+                shape
+                    .fill(.red)
+                    .opacity(0.10 + 0.08 * phase)
+                    .overlay {
+                        if isHovered { shape.fill(theme.accent.opacity(0.06)) }
+                    }
+            }
         } else if isHovered {
             shape.fill(theme.accent.opacity(0.06))
         } else {
