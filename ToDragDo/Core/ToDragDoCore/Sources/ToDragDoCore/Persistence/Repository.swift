@@ -532,18 +532,28 @@ public final class Repository: RemoteApplier {
     public func applyRemote(_ records: [ChangeRecord]) async throws {
         var changed = false
         for record in records where record.deviceId != deviceId {
-            switch record.entityType {
-            case "Project":
-                try await applyRemoteProject(record)
-            case SettingsSnapshot.entityType:
-                applyRemoteSettings(record)
-                // Settings don't touch the items table — skip the reload
-                // they don't need by not flipping `changed`.
+            // Per-record tolerance: one undecodable or storage-rejecting
+            // record (e.g., a future entityType this build doesn't know,
+            // or a payload shape that fails to decode as Item/Project)
+            // must not abort the rest of the batch. CKSyncEngine advances
+            // its state token during fetch, so a throw here would also
+            // mean the surviving records are never redelivered.
+            do {
+                switch record.entityType {
+                case "Project":
+                    try await applyRemoteProject(record)
+                case SettingsSnapshot.entityType:
+                    applyRemoteSettings(record)
+                    // Settings don't touch the items table — skip the reload
+                    // they don't need by not flipping `changed`.
+                    continue
+                default:
+                    try await applyRemoteItem(record)
+                }
+                changed = true
+            } catch {
                 continue
-            default:
-                try await applyRemoteItem(record)
             }
-            changed = true
         }
         if changed {
             // applyRemote is the post-pull path — use plain `reload()` so
