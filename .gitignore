@@ -1,0 +1,23 @@
+# macOS
+.DS_Store
+
+# Xcode build output
+build/
+DerivedData/
+*.xcuserstate
+
+# Local build script output (xcodebuild via scripts/test-build.sh,
+# scripts/build-dev-icloud.sh)
+.build-dev-icloud/
+.build/
+
+# Per-user Xcode state (schemes, window layout, breakpoints)
+xcuserdata/
+*.xcuserdatad/
+
+# SwiftPM
+.swiftpm/
+
+# Editor swap files
+*.swp
+*.swo
