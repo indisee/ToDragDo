@@ -245,6 +245,8 @@ struct ItemRow: View {
                 Image(systemName: "pencil")
                     .font(.system(size: theme.bodySize, weight: .medium))
                     .foregroundStyle(.secondary)
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help("Edit")
@@ -253,6 +255,8 @@ struct ItemRow: View {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: theme.bodySize, weight: .medium))
                     .foregroundStyle(.secondary)
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help("Close")

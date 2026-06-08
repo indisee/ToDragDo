@@ -37,6 +37,9 @@ struct InputBar: View {
                         .font(.system(size: theme.bodySize))
                         .focused($isFieldFocused)
                         .onSubmit { Task { await submit() } }
+                        .onExitCommand {
+                            if isEditing { panelState.endEdit() }
+                        }
                         .onChange(of: panelState.editingItemId) { _, newValue in
                             if newValue != nil { isFieldFocused = true }
                         }

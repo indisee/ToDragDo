@@ -19,8 +19,10 @@ struct FolderTabBar: View {
         // requiring a panel toggle.
         TimelineView(.periodic(from: .now, by: 60)) { context in
             let now = context.date
+            let limboItems = repository.items[.libmo] ?? []
+            let filter = panelState.filterProjectIds
             let limboBlinks = LimboStaleness.anyStale(
-                in: repository.items[.libmo] ?? [],
+                in: filter.isEmpty ? limboItems : limboItems.filter { filter.contains($0.projectId) },
                 threshold: settings.limboBlinkDays,
                 now: now
             )
