@@ -22,9 +22,9 @@ import ToDragDoCore
 /// `automaticallySync` is `false` so we don't need APNs push entitlements
 /// in stage-1; the host drives sync via `SyncCoordinator.syncAll()`.
 @MainActor
-final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineDelegate {
-    nonisolated let providerId: String = "icloud"
-    nonisolated let displayName: String = "iCloud"
+public final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineDelegate {
+    public nonisolated let providerId: String = "icloud"
+    public nonisolated let displayName: String = "iCloud"
 
     private let log = Logger(subsystem: "com.turtle.todragdo", category: "CloudKit")
     private let container: CKContainer
@@ -45,11 +45,17 @@ final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineDelegate
     /// Records pulled during the current `pull(since:)` call.
     private var pullBuffer: [ChangeRecord] = []
 
-    init(containerIdentifier: String) {
+    /// `assetDirectory` defaults to `applicationSupportDirectory/CloudKitAssets`,
+    /// which is correct on macOS. iOS callers that need a shared App Group
+    /// directory should pass it in explicitly.
+    public init(
+        containerIdentifier: String,
+        assetDirectory: URL? = nil
+    ) {
         self.container = CKContainer(identifier: containerIdentifier)
         self.database = container.privateCloudDatabase
         self.stateStore = CloudKitStateStore()
-        self.assetDirectory = Self.makeAssetDirectory()
+        self.assetDirectory = assetDirectory ?? Self.makeDefaultAssetDirectory()
         super.init()
     }
 
@@ -58,7 +64,7 @@ final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineDelegate
     /// schedule) the save fails permanently. Stash assets in the app's
     /// Application Support directory instead and clean them up only after
     /// CloudKit confirms the save.
-    private static func makeAssetDirectory() -> URL {
+    private static func makeDefaultAssetDirectory() -> URL {
         let fm = FileManager.default
         let base: URL
         do {
@@ -69,9 +75,6 @@ final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineDelegate
                 create: true
             )
         } catch {
-            // App Support unavailable is extremely unusual; fall back to
-            // tmp so the app still functions, even if some assets may be
-            // swept. The next push cycle regenerates the file.
             base = fm.temporaryDirectory
         }
         let dir = base.appendingPathComponent("CloudKitAssets", isDirectory: true)
@@ -87,7 +90,6 @@ final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineDelegate
         )
         config.automaticallySync = false
         let engine = CKSyncEngine(config)
-        // Ensure our custom zone exists on first send.
         let zone = CKRecordZone(zoneID: CloudKitSchema.recordZoneID)
         engine.state.add(pendingDatabaseChanges: [.saveZone(zone)])
         return engine
@@ -95,11 +97,9 @@ final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineDelegate
 
     // MARK: - RemoteAdapter
 
-    func push(_ changes: [ChangeRecord]) async throws -> PushOutcome {
+    public func push(_ changes: [ChangeRecord]) async throws -> PushOutcome {
         guard !changes.isEmpty else { return .empty }
 
-        // Reset per-cycle tracking. Stage everything we plan to send so the
-        // delegate's `nextRecordZoneChangeBatch` can materialize records.
         cycleSucceeded.removeAll(keepingCapacity: true)
         cycleFailed.removeAll(keepingCapacity: true)
         for change in changes {
@@ -119,11 +119,6 @@ final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineDelegate
         do {
             try await engine.sendChanges()
         } catch {
-            // Keep cycleSucceeded/cycleFailed: the delegate may have
-            // recorded outcomes for some records BEFORE sendChanges threw.
-            // We bundle the verbose top-level error so any record that did
-            // not get a delegate event still surfaces a meaningful reason
-            // instead of a generic placeholder.
             topLevelReason = CloudKitErrorDescribe.verbose(error, phase: "sendChanges")
             log.error("CKSyncEngine.sendChanges threw: \(topLevelReason ?? "", privacy: .public)")
         }
@@ -146,17 +141,14 @@ final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineDelegate
             }
         }
 
-        // Drop staging so we don't hold change snapshots in memory longer
-        // than needed. CKSyncEngine keeps its own pending state for any
-        // unresolved records and will surface them again on the next push.
         for id in pushedIds {
             stagedPushes.removeValue(forKey: id)
         }
         return PushOutcome(succeeded: succeeded, failed: failed)
     }
 
-    func pull(since cursor: SyncCursor) async throws -> (changes: [ChangeRecord], next: SyncCursor) {
-        _ = cursor  // engine maintains its own state; argument is informational
+    public func pull(since cursor: SyncCursor) async throws -> (changes: [ChangeRecord], next: SyncCursor) {
+        _ = cursor
         pullBuffer.removeAll(keepingCapacity: true)
         do {
             try await engine.fetchChanges()
@@ -173,7 +165,7 @@ final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineDelegate
 
     // MARK: - CKSyncEngineDelegate
 
-    func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
+    public func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
         switch event {
         case .stateUpdate(let update):
             stateStore.save(update.stateSerialization)
@@ -186,8 +178,6 @@ final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineDelegate
                     log.warning("Dropped undecodable record from iCloud: \(modification.record.recordID.recordName)")
                 }
             }
-            // Deletions on our append-only zone aren't expected during
-            // normal operation — log if they occur.
             if !fetched.deletions.isEmpty {
                 log.notice("Ignored \(fetched.deletions.count) record deletions from iCloud")
             }
@@ -208,9 +198,6 @@ final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineDelegate
                 log.error("iCloud save failed for \(recordName, privacy: .public): \(reason, privacy: .public)")
                 if let id = UUID(uuidString: recordName) {
                     cycleFailed[id] = reason
-                    // Conflict ("record already exists") means the record
-                    // is on the server with our content — treat as success
-                    // so we don't loop forever retrying.
                     if failure.error.code == .serverRecordChanged {
                         cycleFailed.removeValue(forKey: id)
                         cycleSucceeded.insert(id)
@@ -227,7 +214,7 @@ final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineDelegate
         }
     }
 
-    func nextRecordZoneChangeBatch(
+    public func nextRecordZoneChangeBatch(
         _ context: CKSyncEngine.SendChangesContext,
         syncEngine: CKSyncEngine
     ) async -> CKSyncEngine.RecordZoneChangeBatch? {
@@ -235,9 +222,6 @@ final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineDelegate
         let pending = syncEngine.state.pendingRecordZoneChanges.filter { scope.contains($0) }
         guard !pending.isEmpty else { return nil }
 
-        // Snapshot the staged map and asset directory so the Sendable
-        // closure passed to `RecordZoneChangeBatch` doesn't capture
-        // main-actor state.
         let staged = stagedPushes
         let assetDir = assetDirectory
         return await CKSyncEngine.RecordZoneChangeBatch(pendingChanges: pending) { recordID in
@@ -258,8 +242,13 @@ final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineDelegate
 /// Wraps a CloudKit error so the verbose multi-line detail appears in
 /// `localizedDescription` — the only channel the cross-platform
 /// `SyncCoordinator` reads when it builds `SyncStatus.lastError`.
-struct CloudKitAdapterError: LocalizedError {
-    let detail: String
-    let underlying: any Error
-    var errorDescription: String? { detail }
+public struct CloudKitAdapterError: LocalizedError {
+    public let detail: String
+    public let underlying: any Error
+    public var errorDescription: String? { detail }
+
+    public init(detail: String, underlying: any Error) {
+        self.detail = detail
+        self.underlying = underlying
+    }
 }

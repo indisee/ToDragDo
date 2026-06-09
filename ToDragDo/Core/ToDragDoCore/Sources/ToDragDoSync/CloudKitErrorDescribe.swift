@@ -5,8 +5,8 @@ import Foundation
 /// human-readable multi-line string. The whole point is to NEVER hide
 /// useful diagnostic detail — the user should be able to read the full
 /// reason from the Sync settings pane without diving into Console.
-enum CloudKitErrorDescribe {
-    static func verbose(_ error: any Error, phase: String? = nil) -> String {
+public enum CloudKitErrorDescribe {
+    public static func verbose(_ error: any Error, phase: String? = nil) -> String {
         var lines: [String] = []
         if let phase {
             lines.append("\(phase) failed:")
@@ -59,8 +59,6 @@ enum CloudKitErrorDescribe {
             }
         }
 
-        // Other potentially useful userInfo keys that aren't already covered
-        // by the convenience properties above.
         let coveredKeys: Set<String> = [
             NSLocalizedDescriptionKey,
             NSLocalizedFailureReasonErrorKey,
@@ -73,7 +71,7 @@ enum CloudKitErrorDescribe {
             "CKPartialErrorsByItemIDKey"
         ]
         for (key, value) in nsError.userInfo where !coveredKeys.contains(key) {
-            if value is Error { continue }  // handled below
+            if value is Error { continue }
             lines.append("\(indent)  \(key): \(value)")
         }
 
@@ -94,9 +92,6 @@ enum CloudKitErrorDescribe {
         }
     }
 
-    /// `String(describing:)` on a CKError.Code returns the case name
-    /// (e.g. `"zoneNotFound"`) via Swift reflection — future SDK cases
-    /// surface automatically without an exhaustive switch to maintain.
     private static func name(of code: CKError.Code) -> String {
         String(describing: code)
     }

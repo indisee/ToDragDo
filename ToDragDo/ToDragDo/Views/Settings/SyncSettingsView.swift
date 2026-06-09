@@ -1,5 +1,6 @@
 import SwiftUI
 import ToDragDoCore
+import ToDragDoSync
 
 /// Sync pane. Renders one row per registered provider; for now that's just
 /// iCloud. Users toggle the provider on/off, force a manual sync, and see
@@ -250,7 +251,7 @@ private func makeSyncSettingsPreviewHost() -> some View {
     let watcher = CloudKitAccountWatcher(
         containerIdentifier: "iCloud.com.turtle.todragdo.sync.container",
         coordinator: coordinator,
-        settings: settings
+        preference: settings
     )
     let health = StorageHealth(notice: .rescued(
         itemCount: 42,

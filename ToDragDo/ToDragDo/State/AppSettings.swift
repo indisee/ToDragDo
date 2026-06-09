@@ -2,12 +2,13 @@ import CoreGraphics
 import Foundation
 import Observation
 import ToDragDoCore
+import ToDragDoSync
 
 /// User-controlled app settings, persisted via UserDefaults.
 /// Single source of truth across the panel and Settings scene.
 @MainActor
 @Observable
-final class AppSettings {
+final class AppSettings: ICloudSyncPreference {
     /// Allowed range for the floating panel's width. Min just keeps the
     /// chevron + a stub of a folder tab visible; max stops a careless
     /// drag from filling the screen.

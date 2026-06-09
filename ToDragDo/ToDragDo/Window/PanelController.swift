@@ -1,6 +1,8 @@
 import AppKit
 import SwiftUI
 import ToDragDoCore
+import ToDragDoContentTypes
+import ToDragDoSync
 
 /// Owns the always-on-top `NSPanel` and the SwiftUI tree it hosts.
 ///
@@ -25,6 +27,7 @@ final class PanelController {
         settings: AppSettings,
         coordinator: SyncCoordinator,
         accountWatcher: CloudKitAccountWatcher,
+        contentTypes: ContentTypeRegistry,
         storageHealth: StorageHealth,
         dataLocation: DataLocation
     ) {
@@ -61,12 +64,14 @@ final class PanelController {
             settings: settings,
             coordinator: coordinator,
             accountWatcher: accountWatcher,
+            contentTypes: contentTypes,
             storageHealth: storageHealth,
             dataLocation: dataLocation
         )
         self.summaryWindow = SummaryWindow(
             repository: repository,
-            settings: settings
+            settings: settings,
+            contentTypes: contentTypes
         )
         self.isVisible = false
 
@@ -78,6 +83,7 @@ final class PanelController {
                     .environment(repository)
                     .environment(settings)
                     .environment(self)
+                    .environment(\.contentTypes, contentTypes)
             )
         )
         host.sizingOptions = [.preferredContentSize]

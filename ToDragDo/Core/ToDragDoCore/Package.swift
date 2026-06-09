@@ -8,11 +8,29 @@ let package = Package(
         .iOS(.v17)
     ],
     products: [
-        .library(name: "ToDragDoCore", targets: ["ToDragDoCore"])
+        .library(name: "ToDragDoCore", targets: ["ToDragDoCore"]),
+        .library(name: "ToDragDoSync", targets: ["ToDragDoSync"]),
+        .library(name: "ToDragDoContentTypes", targets: ["ToDragDoContentTypes"])
     ],
     targets: [
         .target(
             name: "ToDragDoCore",
+            swiftSettings: [
+                .enableUpcomingFeature("StrictConcurrency"),
+                .enableUpcomingFeature("ExistentialAny")
+            ]
+        ),
+        .target(
+            name: "ToDragDoSync",
+            dependencies: ["ToDragDoCore"],
+            swiftSettings: [
+                .enableUpcomingFeature("StrictConcurrency"),
+                .enableUpcomingFeature("ExistentialAny")
+            ]
+        ),
+        .target(
+            name: "ToDragDoContentTypes",
+            dependencies: ["ToDragDoCore"],
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency"),
                 .enableUpcomingFeature("ExistentialAny")

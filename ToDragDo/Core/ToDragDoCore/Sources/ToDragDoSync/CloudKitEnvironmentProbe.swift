@@ -1,5 +1,7 @@
 import Foundation
+#if os(macOS)
 import Security
+#endif
 
 /// Reads the actual entitlement values baked into the signed app binary at
 /// runtime. The CloudKit framework reads
@@ -8,11 +10,14 @@ import Security
 /// vs Production) to talk to — so if the value here disagrees with what you
 /// put in `ToDragDo.entitlements`, the build wasn't re-signed with the new
 /// file, or Xcode's signing pipeline stripped/overrode it.
-enum CloudKitEnvironmentProbe {
-    /// The raw entitlement value as embedded in the signed binary.
-    /// Returns nil when the entitlement isn't set (CloudKit then uses its
-    /// own default: Development for Debug, Production for Release).
-    static var entitlementValue: String? {
+///
+/// The probe relies on `SecTaskCreateFromSelf` / `SecTaskCopyValueForEntitlement`,
+/// which are macOS-only. iOS returns a fixed "not probed" summary —
+/// CloudKit picks its environment from the signed entitlement the same
+/// way, but the introspection API isn't part of the public iOS SDK.
+public enum CloudKitEnvironmentProbe {
+    public static var entitlementValue: String? {
+        #if os(macOS)
         guard let task = SecTaskCreateFromSelf(nil) else { return nil }
         var unmanagedError: Unmanaged<CFError>?
         let value = SecTaskCopyValueForEntitlement(
@@ -22,7 +27,6 @@ enum CloudKitEnvironmentProbe {
         )
         unmanagedError?.release()
         guard let value else { return nil }
-        // Apple accepts both string and array shapes in this entitlement.
         if let string = value as? String {
             return string
         }
@@ -30,15 +34,21 @@ enum CloudKitEnvironmentProbe {
             return array.joined(separator: ", ")
         }
         return String(describing: value)
+        #else
+        return nil
+        #endif
     }
 
-    /// Human-readable summary for surfacing in the Sync settings UI.
-    static var summary: String {
+    public static var summary: String {
+        #if os(macOS)
         switch entitlementValue {
         case .none:
             return "not set — CloudKit chooses based on build config"
         case .some(let value):
             return value
         }
+        #else
+        return "not probed on iOS (CloudKit uses the signed entitlement)"
+        #endif
     }
 }

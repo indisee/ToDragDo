@@ -1,6 +1,8 @@
 import SwiftUI
 import AppKit
 import ToDragDoCore
+import ToDragDoContentTypes
+import ToDragDoSync
 
 /// Root view of the always-on-top panel.
 /// Composes Input + Folder tabs + Item list. Owns no business logic;
@@ -110,13 +112,16 @@ struct PanelView: View {
     let watcher = CloudKitAccountWatcher(
         containerIdentifier: "iCloud.preview",
         coordinator: coordinator,
-        settings: settings
+        preference: settings
     )
+    let registry = ContentTypeRegistry()
+    registry.registerBuiltIns()
     let controller = PanelController(
         repository: repo,
         settings: settings,
         coordinator: coordinator,
         accountWatcher: watcher,
+        contentTypes: registry,
         storageHealth: StorageHealth(),
         dataLocation: DataLocation()
     )

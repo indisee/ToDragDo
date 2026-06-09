@@ -9,20 +9,20 @@ import ToDragDoCore
 /// Members are `nonisolated`: the encoder/decoder are pure functions called
 /// from CloudKit's Sendable closures, which the project's MainActor default
 /// isolation would otherwise reject.
-enum CloudKitSchema {
-    nonisolated static let zoneName = "TDDChanges"
-    nonisolated static let recordType = "ChangeRecord"
+public enum CloudKitSchema {
+    public nonisolated static let zoneName = "TDDChanges"
+    public nonisolated static let recordType = "ChangeRecord"
 
-    enum Field {
-        nonisolated static let entityType = "entityType"
-        nonisolated static let entityId = "entityId"
-        nonisolated static let op = "op"
-        nonisolated static let ts = "ts"
-        nonisolated static let deviceId = "deviceId"
-        nonisolated static let snapshot = "snapshot"
+    public enum Field {
+        public nonisolated static let entityType = "entityType"
+        public nonisolated static let entityId = "entityId"
+        public nonisolated static let op = "op"
+        public nonisolated static let ts = "ts"
+        public nonisolated static let deviceId = "deviceId"
+        public nonisolated static let snapshot = "snapshot"
     }
 
-    nonisolated static var recordZoneID: CKRecordZone.ID {
+    public nonisolated static var recordZoneID: CKRecordZone.ID {
         CKRecordZone.ID(zoneName: zoneName, ownerName: CKCurrentUserDefaultName)
     }
 
@@ -31,7 +31,7 @@ enum CloudKitSchema {
     /// asynchronously after the record is staged, so a file in `/tmp` may
     /// be swept by the OS before CloudKit reads it, causing every save to
     /// fail permanently. Caller is responsible for creating the directory.
-    nonisolated static func makeRecord(
+    public nonisolated static func makeRecord(
         from change: ChangeRecord,
         assetDirectory: URL
     ) throws -> CKRecord {
@@ -52,7 +52,7 @@ enum CloudKitSchema {
         return record
     }
 
-    nonisolated static func decode(_ record: CKRecord) -> ChangeRecord? {
+    public nonisolated static func decode(_ record: CKRecord) -> ChangeRecord? {
         guard
             let id = UUID(uuidString: record.recordID.recordName),
             let entityType = record[Field.entityType] as? String,

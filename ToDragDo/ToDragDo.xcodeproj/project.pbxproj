@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		A92644122FAEBBAD0085F688 /* ToDragDoCore in Frameworks */ = {isa = PBXBuildFile; productRef = A92644112FAEBBAD0085F688 /* ToDragDoCore */; };
+		A92644212FAEBBAD0085F688 /* ToDragDoSync in Frameworks */ = {isa = PBXBuildFile; productRef = A92644202FAEBBAD0085F688 /* ToDragDoSync */; };
+		A92644312FAEBBAD0085F688 /* ToDragDoContentTypes in Frameworks */ = {isa = PBXBuildFile; productRef = A92644302FAEBBAD0085F688 /* ToDragDoContentTypes */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -28,6 +30,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				A92644122FAEBBAD0085F688 /* ToDragDoCore in Frameworks */,
+				A92644212FAEBBAD0085F688 /* ToDragDoSync in Frameworks */,
+				A92644312FAEBBAD0085F688 /* ToDragDoContentTypes in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -71,6 +75,8 @@
 			name = ToDragDo;
 			packageProductDependencies = (
 				A92644112FAEBBAD0085F688 /* ToDragDoCore */,
+				A92644202FAEBBAD0085F688 /* ToDragDoSync */,
+				A92644302FAEBBAD0085F688 /* ToDragDoContentTypes */,
 			);
 			productName = ToDragDo;
 			productReference = A92643FF2FAEBBAD0085F688 /* ToDragDo.app */;
@@ -352,6 +358,14 @@
 		A92644112FAEBBAD0085F688 /* ToDragDoCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ToDragDoCore;
+		};
+		A92644202FAEBBAD0085F688 /* ToDragDoSync */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ToDragDoSync;
+		};
+		A92644302FAEBBAD0085F688 /* ToDragDoContentTypes */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ToDragDoContentTypes;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

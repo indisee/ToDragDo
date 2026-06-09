@@ -1,5 +1,6 @@
 import SwiftUI
 import ToDragDoCore
+import ToDragDoContentTypes
 
 /// Read-only row used inside the Done-summary window.
 ///
@@ -19,6 +20,7 @@ import ToDragDoCore
 ///   segment is off — the segment is the way to collapse everything.
 struct SummaryItemRow: View {
     @Environment(\.theme) private var theme
+    @Environment(\.contentTypes) private var contentTypes
     @Environment(Repository.self) private var repository
     @Environment(PanelState.self) private var panelState
 
@@ -110,7 +112,7 @@ struct SummaryItemRow: View {
     private var attachmentPreviews: some View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(Array(payload.attachments.enumerated()), id: \.offset) { _, attachment in
-                AttachmentPreview(attachment: attachment)
+                contentTypes.resolve(attachment: attachment).fullView(for: attachment)
             }
         }
         .padding(.horizontal, 10)

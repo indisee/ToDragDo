@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import ToDragDoCore
+import ToDragDoContentTypes
 import UniformTypeIdentifiers
 
 /// A single (closed or open) item row.
@@ -30,6 +31,7 @@ struct ItemRow: View {
     @Environment(PanelState.self) private var panelState
     @Environment(DragSession.self) private var session
     @Environment(AppSettings.self) private var settings
+    @Environment(\.contentTypes) private var contentTypes
 
     let item: Item
     var trashMode: Bool = false
@@ -311,7 +313,7 @@ struct ItemRow: View {
     private var attachmentPreviews: some View {
         VStack(alignment: .leading, spacing: 8) {
             ForEach(Array(payload.attachments.enumerated()), id: \.offset) { _, attachment in
-                AttachmentPreview(attachment: attachment)
+                contentTypes.resolve(attachment: attachment).fullView(for: attachment)
             }
         }
         .padding(.leading, 22)

@@ -1,12 +1,19 @@
 import SwiftUI
 import ToDragDoCore
+import ToDragDoContentTypes
 
 /// Leading per-row indicator. Two modes:
-/// - **Type**: `=` plain text · `+` Jira · `0` URL — colored per type.
+/// - **Type**: symbol + tint resolved from the content-type registry.
 /// - **Date**: when the item has a `dueDate`, shows `dd` over `MMM` in
 ///   two lines, replacing the type symbol. Past-due dates render in red.
+///
+/// The hardcoded `switch typeIdentifier` that used to live here moved into
+/// `ContentTypeProvider.badge(forItemTypeIdentifier:)`. Provider plugins
+/// (Jira, GitHub PR, …) ship their own glyph + tint without touching this
+/// file.
 struct TypeBadge: View {
     @Environment(\.theme) private var theme
+    @Environment(\.contentTypes) private var contentTypes
     let typeIdentifier: String
     var dueDate: Date? = nil
     var calendar: Calendar = .autoupdatingCurrent
@@ -25,9 +32,9 @@ struct TypeBadge: View {
             .frame(width: 24, alignment: .center)
             .accessibilityLabel(dueDate.formatted(date: .abbreviated, time: .omitted))
         } else {
-            Text(symbol)
+            Text(badge.symbol)
                 .font(.system(size: theme.bodySize, weight: .semibold, design: .monospaced))
-                .foregroundStyle(color)
+                .foregroundStyle(symbolColor)
                 .frame(width: 18, alignment: .center)
         }
     }
@@ -36,23 +43,16 @@ struct TypeBadge: View {
         calendar.startOfDay(for: date) < calendar.startOfDay(for: now)
     }
 
-    private var symbol: String {
-        switch typeIdentifier {
-        case "jira":     "+"
-        case "url":      "0"
-        case "image":    "■"
-        case "file":     "▤"
-        default:         "="
-        }
+    private var badge: ContentBadge {
+        contentTypes.resolve(itemTypeIdentifier: typeIdentifier)
+            .badge(forItemTypeIdentifier: typeIdentifier)
+            ?? ContentBadge(symbol: "=", color: .secondary)
     }
 
-    private var color: Color {
-        switch typeIdentifier {
-        case "jira":     theme.accent
-        case "url":      .blue
-        case "image":    .green
-        case "file":     .orange
-        default:         .secondary
+    private var symbolColor: Color {
+        switch badge.color {
+        case .accent: return theme.accent
+        default:      return Color(badge.color)
         }
     }
 }
@@ -60,8 +60,9 @@ struct TypeBadge: View {
 #Preview {
     HStack(spacing: 16) {
         TypeBadge(typeIdentifier: "text/plain")
-        TypeBadge(typeIdentifier: "jira")
         TypeBadge(typeIdentifier: "url")
+        TypeBadge(typeIdentifier: "file")
+        TypeBadge(typeIdentifier: "image")
         TypeBadge(typeIdentifier: "text/plain", dueDate: .now)
         TypeBadge(typeIdentifier: "text/plain", dueDate: Date.now.addingTimeInterval(-86_400 * 3))
     }

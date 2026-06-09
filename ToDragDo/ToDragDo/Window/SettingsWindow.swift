@@ -1,6 +1,8 @@
 import AppKit
 import SwiftUI
 import ToDragDoCore
+import ToDragDoContentTypes
+import ToDragDoSync
 
 /// On-demand `NSWindow` for Settings.
 ///
@@ -16,6 +18,7 @@ final class SettingsWindow {
     private let settings: AppSettings
     private let coordinator: SyncCoordinator
     private let accountWatcher: CloudKitAccountWatcher
+    private let contentTypes: ContentTypeRegistry
     private let storageHealth: StorageHealth
     private let dataLocation: DataLocation
 
@@ -24,6 +27,7 @@ final class SettingsWindow {
         settings: AppSettings,
         coordinator: SyncCoordinator,
         accountWatcher: CloudKitAccountWatcher,
+        contentTypes: ContentTypeRegistry,
         storageHealth: StorageHealth,
         dataLocation: DataLocation
     ) {
@@ -31,6 +35,7 @@ final class SettingsWindow {
         self.settings = settings
         self.coordinator = coordinator
         self.accountWatcher = accountWatcher
+        self.contentTypes = contentTypes
         self.storageHealth = storageHealth
         self.dataLocation = dataLocation
     }
@@ -46,6 +51,7 @@ final class SettingsWindow {
                         .environment(accountWatcher)
                         .environment(storageHealth)
                         .environment(dataLocation)
+                        .environment(\.contentTypes, contentTypes)
                 )
             )
             // The SwiftUI tree fixes its own size via `SettingsLayout`,

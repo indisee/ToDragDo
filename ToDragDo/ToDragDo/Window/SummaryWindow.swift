@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import ToDragDoCore
+import ToDragDoContentTypes
 
 /// On-demand `NSWindow` that hosts `SummaryView` — the "done items in
 /// this day/week" review window.
@@ -13,6 +14,7 @@ final class SummaryWindow {
     private var window: NSWindow?
     private let repository: Repository
     private let settings: AppSettings
+    private let contentTypes: ContentTypeRegistry
     private let state = SummaryWindowState(mode: .day)
     // The summary window reuses `ItemRow`, which reads PanelState and
     // DragSession from its environment. Giving the window its own
@@ -21,9 +23,14 @@ final class SummaryWindow {
     private let panelState = PanelState()
     private let dragSession = DragSession()
 
-    init(repository: Repository, settings: AppSettings) {
+    init(
+        repository: Repository,
+        settings: AppSettings,
+        contentTypes: ContentTypeRegistry
+    ) {
         self.repository = repository
         self.settings = settings
+        self.contentTypes = contentTypes
     }
 
     func show(mode: SummaryMode) {
@@ -37,6 +44,7 @@ final class SummaryWindow {
                         .environment(state)
                         .environment(panelState)
                         .environment(dragSession)
+                        .environment(\.contentTypes, contentTypes)
                 )
             )
             let window = NSWindow(

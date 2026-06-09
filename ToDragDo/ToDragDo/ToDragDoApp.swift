@@ -1,6 +1,8 @@
 import OSLog
 import SwiftUI
 import ToDragDoCore
+import ToDragDoContentTypes
+import ToDragDoSync
 
 @main
 struct ToDragDoApp: App {
@@ -12,6 +14,8 @@ struct ToDragDoApp: App {
     @State private var coordinator: SyncCoordinator
     @State private var accountWatcher: CloudKitAccountWatcher
     @State private var syncTicker: SyncTicker
+    @State private var wakeBridge: SyncTickerWakeBridge
+    @State private var contentTypes: ContentTypeRegistry
     @State private var storageHealth: StorageHealth
     @State private var dataLocation: DataLocation
 
@@ -37,13 +41,16 @@ struct ToDragDoApp: App {
         let accountWatcher = CloudKitAccountWatcher(
             containerIdentifier: Self.iCloudContainerIdentifier,
             coordinator: coordinator,
-            settings: settings
+            preference: settings
         )
+        let contentTypes = ContentTypeRegistry()
+        contentTypes.registerBuiltIns()
         let panelController = PanelController(
             repository: repository,
             settings: settings,
             coordinator: coordinator,
             accountWatcher: accountWatcher,
+            contentTypes: contentTypes,
             storageHealth: health,
             dataLocation: dataLocation
         )
@@ -56,6 +63,8 @@ struct ToDragDoApp: App {
             accountWatcher: accountWatcher
         )
         syncTicker.start()
+        let wakeBridge = SyncTickerWakeBridge(ticker: syncTicker)
+        wakeBridge.install()
 
         // After every local write: refresh the pending-push count so the
         // Sync settings UI reflects the queue immediately, then kick a
@@ -77,6 +86,8 @@ struct ToDragDoApp: App {
         _coordinator = State(initialValue: coordinator)
         _accountWatcher = State(initialValue: accountWatcher)
         _syncTicker = State(initialValue: syncTicker)
+        _wakeBridge = State(initialValue: wakeBridge)
+        _contentTypes = State(initialValue: contentTypes)
         _storageHealth = State(initialValue: health)
         _dataLocation = State(initialValue: dataLocation)
     }

@@ -8,26 +8,26 @@ import ToDragDoCore
 /// "icloud" provider's `enabled` flag on `SyncCoordinator` accordingly.
 ///
 /// Policy: a provider is enabled when the user hasn't explicitly opted out
-/// (`AppSettings.iCloudSyncEnabled`) AND `CKContainer.accountStatus` is
+/// (`preference.iCloudSyncEnabled`) AND `CKContainer.accountStatus` is
 /// `.available`. If the user signs out of iCloud, we flip enabled off; if
 /// they sign back in and never opted out, we flip it on.
 @MainActor
 @Observable
-final class CloudKitAccountWatcher {
+public final class CloudKitAccountWatcher {
     private let container: CKContainer
     private let coordinator: SyncCoordinator
-    private let settings: AppSettings
+    private let preference: any ICloudSyncPreference
     private let log = Logger(subsystem: "com.turtle.todragdo", category: "CloudKitAccount")
     private var observer: NSObjectProtocol?
 
-    init(
+    public init(
         containerIdentifier: String,
         coordinator: SyncCoordinator,
-        settings: AppSettings
+        preference: any ICloudSyncPreference
     ) {
         self.container = CKContainer(identifier: containerIdentifier)
         self.coordinator = coordinator
-        self.settings = settings
+        self.preference = preference
         self.observer = NotificationCenter.default.addObserver(
             forName: .CKAccountChanged,
             object: nil,
@@ -43,13 +43,11 @@ final class CloudKitAccountWatcher {
         }
     }
 
-    // No deinit observer removal: watcher lives for the app's lifetime.
-
     /// Recomputes and applies the enabled flag for the iCloud provider.
     /// Returns the resolved enabled state for callers that want to chain
     /// a sync right after (e.g., on app launch).
     @discardableResult
-    func refresh() async -> Bool {
+    public func refresh() async -> Bool {
         let status: CKAccountStatus
         do {
             status = try await container.accountStatus()
@@ -59,7 +57,7 @@ final class CloudKitAccountWatcher {
             return false
         }
         let available = status == .available
-        let enabled = available && settings.iCloudSyncEnabled
+        let enabled = available && preference.iCloudSyncEnabled
         coordinator.setEnabled(enabled, for: "icloud")
         if !available {
             log.notice("iCloud unavailable: status=\(String(describing: status))")
@@ -69,8 +67,8 @@ final class CloudKitAccountWatcher {
 
     /// Called when the user toggles the iCloud switch in Settings. Persists
     /// the preference and re-applies policy.
-    func setUserPreference(_ enabled: Bool) async {
-        settings.iCloudSyncEnabled = enabled
+    public func setUserPreference(_ enabled: Bool) async {
+        preference.iCloudSyncEnabled = enabled
         await refresh()
     }
 }
