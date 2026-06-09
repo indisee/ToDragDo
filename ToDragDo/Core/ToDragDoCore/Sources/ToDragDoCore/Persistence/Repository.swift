@@ -664,6 +664,36 @@ public final class Repository: RemoteApplier {
         return changes.count
     }
 
+    /// One-shot re-push of every live item, trashed item, and project as
+    /// a fresh `update` ChangeRecord. The host (macOS) calls this once
+    /// per device after a CloudKit schema migration so the zone is
+    /// rewritten with the current field layout (inline `snapshotData`
+    /// alongside the legacy `CKAsset`). Without it, clients that can't
+    /// decode legacy records — e.g. iOS Simulator, whose `mmcs` service
+    /// can't fetch the `CKAsset` field — never see records that were
+    /// written by older builds.
+    ///
+    /// Returns the number of records queued.
+    @discardableResult
+    public func reEmitAllAsChanges() async throws -> Int {
+        var changes: [ChangeRecord] = []
+        for (_, slice) in items {
+            for item in slice {
+                changes.append(makeChange(op: .update, item: item))
+            }
+        }
+        for item in trashItems {
+            changes.append(makeChange(op: .update, item: item))
+        }
+        for project in projects {
+            changes.append(makeProjectChange(op: .update, project: project))
+        }
+        if changes.isEmpty { return 0 }
+        try await storage.appendChanges(changes)
+        onWriteCallback?()
+        return changes.count
+    }
+
     private func makeChange(op: ChangeOp, item: Item) -> ChangeRecord {
         let snapshot = (try? encoder.encode(item)) ?? Data()
         return ChangeRecord(

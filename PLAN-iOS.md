@@ -139,8 +139,6 @@ Mechanics:
   - 25% … 75%             → latch phase 1.
   - 75% … 90%             → latch phase 2.
   - ≥ 90%                 → fire default destructive + slide off.
-- Leading swipe (positive translation) = separate `DragGesture`,
-  single-phase Mark Done (Restore in Done).
 - `latchedSwipeItemId` on `PanelState` so opening another row's
   swipe collapses the prior one.
 - Tap on row body when latched → reset latch (don't open the row).
@@ -152,7 +150,7 @@ secondary sets per the table in REQUIREMENTS-iOS.md §Row actions.
 
 Exit criterion: every macOS `RowAction` reachable via swipe; haptics
 fire on phase boundaries; latched state survives scroll; destructive
-arm + leading swipe both fire cleanly.
+arm fires cleanly.
 
 ## Phase 4 · Sync wiring on iOS
 

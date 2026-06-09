@@ -150,17 +150,89 @@ public final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineD
     public func pull(since cursor: SyncCursor) async throws -> (changes: [ChangeRecord], next: SyncCursor) {
         _ = cursor
         pullBuffer.removeAll(keepingCapacity: true)
+        var caughtError: (any Error)?
         do {
             try await engine.fetchChanges()
         } catch {
+            caughtError = error
             let detail = CloudKitErrorDescribe.verbose(error, phase: "fetchChanges")
-            log.error("CKSyncEngine.fetchChanges threw: \(detail, privacy: .public)")
-            pullBuffer.removeAll(keepingCapacity: false)
-            throw CloudKitAdapterError(detail: detail, underlying: error)
+            log.error("CKSyncEngine.fetchChanges errored: \(detail, privacy: .public)")
+        }
+        // When CKSyncEngine bails on per-record asset fetches (common on
+        // the iOS Simulator, whose `mmcs` service can't reliably fetch
+        // CKAssets), side-fetch the failed records WITHOUT the CKAsset
+        // field. Records pushed by clients on the new schema also carry
+        // a `snapshotData` inline field, so the fallback decodes them
+        // cleanly even though the engine's primary fetch couldn't.
+        if let caughtError {
+            let failedIDs = Self.extractFailedRecordIDs(from: caughtError)
+            if !failedIDs.isEmpty {
+                await fallbackFetchInline(failedIDs)
+            }
         }
         let result = pullBuffer
         pullBuffer.removeAll(keepingCapacity: false)
         return (result, SyncCursor(token: stateStore.fingerprint))
+    }
+
+    /// Side-channel fetch that explicitly excludes the legacy CKAsset
+    /// `snapshot` field. CloudKit normally downloads CKAssets eagerly;
+    /// listing only the small fields in `desiredKeys` keeps the fetch
+    /// in metadata-only mode, so per-asset transfer failures don't
+    /// abort the operation.
+    private func fallbackFetchInline(_ ids: [CKRecord.ID]) async {
+        let desiredKeys = [
+            CloudKitSchema.Field.entityType,
+            CloudKitSchema.Field.entityId,
+            CloudKitSchema.Field.op,
+            CloudKitSchema.Field.ts,
+            CloudKitSchema.Field.deviceId,
+            CloudKitSchema.Field.snapshotData,
+        ]
+        do {
+            let results = try await database.records(for: ids, desiredKeys: desiredKeys)
+            var recovered = 0
+            for (_, result) in results {
+                guard case .success(let record) = result,
+                      let change = CloudKitSchema.decode(record) else { continue }
+                // Legacy records without an inline field decode to an
+                // empty snapshot — there's no useful data to apply, so
+                // skip them.
+                guard !change.snapshot.isEmpty else { continue }
+                pullBuffer.append(change)
+                recovered += 1
+            }
+            if recovered > 0 {
+                log.notice("Inline fallback recovered \(recovered) of \(ids.count) records")
+            }
+        } catch {
+            log.error("Inline fallback fetch failed: \(error.localizedDescription, privacy: .public)")
+        }
+    }
+
+    /// Walks a (possibly nested) CKError and collects every record-id
+    /// key in its `partialErrorsByItemID`. Used by `pull()` to discover
+    /// which records the engine couldn't fetch so we can retry them via
+    /// the inline-only fallback path.
+    private nonisolated static func extractFailedRecordIDs(from error: any Error) -> [CKRecord.ID] {
+        var collected: Set<CKRecord.ID> = []
+        walk(error, into: &collected)
+        return Array(collected)
+    }
+
+    private nonisolated static func walk(_ error: any Error, into out: inout Set<CKRecord.ID>) {
+        let nsError = error as NSError
+        if let ck = error as? CKError, let partials = ck.partialErrorsByItemID {
+            for (key, inner) in partials {
+                if let id = key as? CKRecord.ID {
+                    out.insert(id)
+                }
+                walk(inner, into: &out)
+            }
+        }
+        if let underlying = nsError.userInfo[NSUnderlyingErrorKey] as? any Error {
+            walk(underlying, into: &out)
+        }
     }
 
     // MARK: - CKSyncEngineDelegate
@@ -191,6 +263,20 @@ public final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineD
             }
             for failure in sent.failedRecordSaves {
                 let recordName = failure.record.recordID.recordName
+                // `.serverRecordChanged` here = "record already exists
+                // on the server" (CKInternalErrorDomain 2004). Reached
+                // when CKSyncEngine retries a record we already pushed
+                // — local state lost track of the success or the
+                // engine submitted it twice. Either way the server's
+                // copy is canonical, so mark the change pushed and
+                // move on without spamming the log.
+                if failure.error.code == .serverRecordChanged,
+                   let id = UUID(uuidString: recordName) {
+                    log.notice("iCloud record \(recordName, privacy: .public) already on server; treated as pushed")
+                    cycleSucceeded.insert(id)
+                    deleteAssetFile(forChangeId: id)
+                    continue
+                }
                 let reason = CloudKitErrorDescribe.verbose(
                     failure.error,
                     phase: "saveRecord(\(recordName))"
@@ -198,11 +284,6 @@ public final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineD
                 log.error("iCloud save failed for \(recordName, privacy: .public): \(reason, privacy: .public)")
                 if let id = UUID(uuidString: recordName) {
                     cycleFailed[id] = reason
-                    if failure.error.code == .serverRecordChanged {
-                        cycleFailed.removeValue(forKey: id)
-                        cycleSucceeded.insert(id)
-                        deleteAssetFile(forChangeId: id)
-                    }
                 }
             }
 

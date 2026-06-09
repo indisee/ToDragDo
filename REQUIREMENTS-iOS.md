@@ -71,8 +71,6 @@ Functional parity with macOS. Same model (`Item`), same payload
 
 Standard `.swipeActions` doesn't fit — we want a continuous reveal.
 
-- **Leading swipe (rightward):** single-phase quick Mark Done. Past
-  ~40% fires + slides off. Done folder: leading swipe = Restore.
 - **Trailing swipe (leftward):**
   - **Phase 1** (0 … −50%): row slides left exposing the **primary
     action set** for that folder.

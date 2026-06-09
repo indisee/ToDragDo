@@ -6,6 +6,7 @@ import ToDragDoSync
 
 @main
 struct ToDragDoApp: App {
+    @UIApplicationDelegateAdaptor(iOSAppDelegate.self) private var appDelegate
     @State private var repository: Repository
     @State private var settings: AppSettings
     @State private var coordinator: SyncCoordinator
@@ -15,6 +16,7 @@ struct ToDragDoApp: App {
     @State private var contentTypes: ContentTypeRegistry
     @State private var storageHealth: StorageHealth
     @State private var dataLocation: DataLocation
+    @State private var backgroundRefresh: BackgroundRefresh
     @State private var panelState = PanelState()
 
     static let iCloudContainerIdentifier = "iCloud.com.turtle.todragdo.sync.container"
@@ -50,6 +52,8 @@ struct ToDragDoApp: App {
             accountWatcher: accountWatcher
         )
         syncTicker.start()
+        let backgroundRefresh = BackgroundRefresh(coordinator: coordinator)
+        backgroundRefresh.install()
         let contentTypes = ContentTypeRegistry()
         contentTypes.registerBuiltIns()
 
@@ -72,6 +76,7 @@ struct ToDragDoApp: App {
         _contentTypes = State(initialValue: contentTypes)
         _storageHealth = State(initialValue: health)
         _dataLocation = State(initialValue: dataLocation)
+        _backgroundRefresh = State(initialValue: backgroundRefresh)
     }
 
     private static func resolveStorage(from outcome: StorageFactory.InitOutcome) -> any ItemStorage {

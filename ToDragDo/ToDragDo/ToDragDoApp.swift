@@ -79,6 +79,29 @@ struct ToDragDoApp: App {
                 await coordinator?.sync("icloud")
             }
         }
+
+        // One-shot CloudKit schema migration. Re-emits every existing
+        // item, trashed item, and project as a fresh `update` ChangeRecord
+        // so the zone is rewritten with the current field layout
+        // (`snapshotData` inline + `CKAsset` for back-compat). Without
+        // this pass, clients that can't decode legacy records — iOS, in
+        // particular — never see anything that was written before the
+        // schema change. UserDefaults flag gates it so it runs once per
+        // device.
+        let migrationKey = "todragdo.schema.migration.inline_v1"
+        if !UserDefaults.standard.bool(forKey: migrationKey) {
+            Task { @MainActor [weak repository] in
+                guard let repository else { return }
+                do {
+                    try await repository.reload()
+                    let count = try await repository.reEmitAllAsChanges()
+                    UserDefaults.standard.set(true, forKey: migrationKey)
+                    Self.log.notice("Schema migration: re-emitted \(count) records")
+                } catch {
+                    Self.log.error("Schema migration failed: \(error.localizedDescription)")
+                }
+            }
+        }
         _repository = State(initialValue: repository)
         _settings = State(initialValue: settings)
         _panelController = State(initialValue: panelController)

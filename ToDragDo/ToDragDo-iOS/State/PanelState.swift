@@ -19,6 +19,15 @@ final class PanelState {
         }
     }
     var expandedItemId: UUID? = nil
+    /// Flip every row open / closed at once. The Done-summary sheet's
+    /// Open/Closed segment toggles this so all rows in that view obey
+    /// the segment regardless of individual expansion.
+    var allExpanded: Bool = false
+    /// Item whose `RowSwipeContainer` is currently latched open.
+    /// Setting this collapses the previously latched row — each
+    /// container observes the property and closes itself when it sees
+    /// a different id (or `nil`) land.
+    var latchedSwipeItemId: UUID? = nil
 
     var inputDraft: String = ""
     var pendingAttachments: [Attachment] = []
