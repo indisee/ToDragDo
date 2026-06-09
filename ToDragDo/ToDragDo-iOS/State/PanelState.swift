@@ -18,6 +18,17 @@ final class PanelState {
             expandedItemId = nil
         }
     }
+    /// The tab the user is currently looking at. Distinct from
+    /// `selectedFolder` because `.more` lives off the folder axis — if
+    /// we derived the tab from `selectedFolder` alone, any settings-pane
+    /// re-render would snap the tab bar back to a folder tab.
+    var selectedTab: Tab = .today {
+        didSet {
+            if let folder = selectedTab.folder, folder != selectedFolder {
+                selectedFolder = folder
+            }
+        }
+    }
     var expandedItemId: UUID? = nil
     /// Flip every row open / closed at once. The Done-summary sheet's
     /// Open/Closed segment toggles this so all rows in that view obey

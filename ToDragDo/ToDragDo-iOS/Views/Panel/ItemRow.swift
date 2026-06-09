@@ -27,8 +27,25 @@ struct ItemRow: View {
     let item: Item
     var trashMode: Bool = false
 
+    /// Per-row decode + linkify cache. Without this, `payload`,
+    /// `displayText`, and `attributedDisplay` re-ran `ItemPayload.decode`
+    /// (JSON parse) and `NSDataDetector.matches` (regex scan) on every
+    /// access — and SwiftUI subviews access them multiple times per body
+    /// call, multiplied by every visible row, every scroll frame. The
+    /// cache invalidates by comparing `item.payload` (`Data`) so any
+    /// repository update refreshes it on first access.
+    ///
+    /// `@State` on a class instance: SwiftUI binds the storage to view
+    /// identity; mutating the class's properties doesn't trigger
+    /// re-renders, which is what we want for a pure perf cache.
+    @State private var rowCache = ItemRowCache()
+
     private var isExpanded: Bool { panelState.expandedItemId == item.id }
-    private var payload: ItemPayload { ItemPayload.decode(item.payload) }
+
+    private var payload: ItemPayload {
+        rowCache.refresh(from: item)
+        return rowCache.payload
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -94,7 +111,10 @@ struct ItemRow: View {
         return .secondary
     }
 
-    /// Note + optional date stamp + attachment icon strip.
+    /// Note + optional date stamp + attachment icon strip. Reorder
+    /// works via `List`'s native `.onMove` — long-press anywhere on the
+    /// row lifts it, system handles the drop indicator. No custom drag
+    /// handle on the row chrome.
     private var contentLine: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
             noteText
@@ -218,22 +238,20 @@ struct ItemRow: View {
     // MARK: - Display text
 
     private var displayText: String {
-        if !payload.note.isEmpty { return payload.note }
-        if let label = payload.attachments.first?.displayLabel, !label.isEmpty {
-            return label
-        }
-        return "—"
+        rowCache.refresh(from: item)
+        return rowCache.displayText
     }
 
     private var attributedDisplay: AttributedString {
-        Self.linkify(displayText)
+        rowCache.refresh(from: item)
+        return rowCache.attributedDisplay
     }
 
-    private static let linkDetector: NSDataDetector? = {
+    static let linkDetector: NSDataDetector? = {
         try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue)
     }()
 
-    private static func linkify(_ text: String) -> AttributedString {
+    static func linkify(_ text: String) -> AttributedString {
         var attr = AttributedString(text)
         guard !text.isEmpty, let detector = linkDetector else { return attr }
         let range = NSRange(text.startIndex..<text.endIndex, in: text)
@@ -249,5 +267,34 @@ struct ItemRow: View {
             attr[attrRange].underlineStyle = .single
         }
         return attr
+    }
+}
+
+/// Per-row decode cache. Holds the JSON-parsed payload + the linkified
+/// `AttributedString`, refreshed lazily when `item.payload` changes.
+/// Class (not struct) so SwiftUI's `@State` binds a stable identity and
+/// mutations don't trigger view re-renders — this is a pure performance
+/// cache, not observable state.
+private final class ItemRowCache {
+    private var sourceData: Data?
+    var payload: ItemPayload = ItemPayload()
+    var displayText: String = "—"
+    var attributedDisplay: AttributedString = AttributedString("—")
+
+    func refresh(from item: Item) {
+        guard sourceData != item.payload else { return }
+        let p = ItemPayload.decode(item.payload)
+        payload = p
+        let text: String
+        if !p.note.isEmpty {
+            text = p.note
+        } else if let label = p.attachments.first?.displayLabel, !label.isEmpty {
+            text = label
+        } else {
+            text = "—"
+        }
+        displayText = text
+        attributedDisplay = ItemRow.linkify(text)
+        sourceData = item.payload
     }
 }

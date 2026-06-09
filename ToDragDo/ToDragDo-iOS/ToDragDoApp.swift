@@ -17,6 +17,7 @@ struct ToDragDoApp: App {
     @State private var storageHealth: StorageHealth
     @State private var dataLocation: DataLocation
     @State private var backgroundRefresh: BackgroundRefresh
+    @State private var captureMonitor: ScreenCaptureMonitor
     @State private var panelState = PanelState()
 
     static let iCloudContainerIdentifier = "iCloud.com.turtle.todragdo.sync.container"
@@ -77,6 +78,7 @@ struct ToDragDoApp: App {
         _storageHealth = State(initialValue: health)
         _dataLocation = State(initialValue: dataLocation)
         _backgroundRefresh = State(initialValue: backgroundRefresh)
+        _captureMonitor = State(initialValue: ScreenCaptureMonitor())
     }
 
     private static func resolveStorage(from outcome: StorageFactory.InitOutcome) -> any ItemStorage {
@@ -113,6 +115,7 @@ struct ToDragDoApp: App {
                 .environment(accountWatcher)
                 .environment(storageHealth)
                 .environment(dataLocation)
+                .environment(captureMonitor)
                 .environment(panelState)
                 .environment(\.contentTypes, contentTypes)
                 .preferredColorScheme(settings.appearance.colorScheme)

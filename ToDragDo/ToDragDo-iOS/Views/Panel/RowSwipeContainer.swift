@@ -33,15 +33,13 @@ struct RowSwipeContainer<Content: View>: View {
     @State private var lastHapticPhase: Int = 0
     @State private var assignDateSheet: Bool = false
     @State private var assignProjectSheet: Bool = false
-    /// True while another row is being dragged over this one — used to
-    /// render the "drop will land here" indicator at the top edge.
-    @State private var isDropTarget: Bool = false
-    /// Captured at the start of each gesture (first `onChanged` call) and
-    /// read in `onEnded`. Decision logic must key off the starting latch
-    /// because "where the user dragged from" determines what a release
-    /// means — releasing while already at phase 2 with no movement
-    /// shouldn't fire destructive.
-    @GestureState private var dragStart: Latch? = nil
+    /// Captured on the first event of each pan and read in the end
+    /// handler. Decision logic keys off the starting latch because
+    /// "where the user dragged from" determines what a release means —
+    /// releasing while already at phase 2 with no movement shouldn't
+    /// fire destructive. Plain `@State` instead of `@GestureState`
+    /// because we drive the gesture from a UIKit-bridged recognizer.
+    @State private var dragStartLatch: Latch? = nil
 
     /// Static stored properties aren't legal on generic structs; the
     /// constants live on the non-generic `Const` enum at file scope and
@@ -120,41 +118,19 @@ struct RowSwipeContainer<Content: View>: View {
                     }
                 }
                 .offset(x: offset)
-                // Long-press drag for reorder. iOS gates `.draggable`
-                // on a system long-press, so it doesn't fight the
-                // quick-swipe `DragGesture` (short pull = reveal
-                // actions; hold first = lift the row to reorder).
-                .draggable(item.id.uuidString) {
-                    Text(dragPreviewText)
-                        .font(.system(size: 14, weight: .medium))
-                        .lineLimit(1)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(.thickMaterial, in: RoundedRectangle(cornerRadius: 10))
-                }
-                .dropDestination(for: String.self) { dropped, _ in
-                    handleDrop(dropped)
-                } isTargeted: { hovering in
-                    isDropTarget = hovering
-                }
-                .overlay(alignment: .top) {
-                    // Accent bar above the row while a drag hovers it —
-                    // the drop lands the item directly before this row,
-                    // so the bar sits at the leading edge of where it
-                    // will appear.
-                    if isDropTarget {
-                        Rectangle()
-                            .fill(theme.accent)
-                            .frame(height: 3)
-                    }
-                }
-                // Gesture only on the content layer so the trailing
-                // action strip's button taps don't compete with it.
-                // `.simultaneousGesture` lets the DragGesture coexist
-                // with the enclosing ScrollView's pan — vertical
-                // motion still scrolls because our `.onChanged` bails
-                // when `|dy| > |dx| * 1.4`.
-                .simultaneousGesture(swipeGesture)
+                // UIKit-bridged horizontal pan: coexists with
+                // UIScrollView's pan (delegate returns true to
+                // `shouldRecognizeSimultaneouslyWith`) and only begins
+                // when horizontal velocity dominates. SwiftUI's
+                // `DragGesture` + `simultaneousGesture` cancels the
+                // ScrollView pan once it recognizes — that broke
+                // vertical scroll on every list.
+                .gesture(
+                    HorizontalPanGesture(
+                        onChanged: handlePanChanged,
+                        onEnded: handlePanEnded
+                    )
+                )
         }
         .frame(maxWidth: .infinity)
         .clipped()
@@ -208,110 +184,62 @@ struct RowSwipeContainer<Content: View>: View {
         .accessibilityLabel(action.helpText)
     }
 
-    // MARK: - Gesture
+    // MARK: - Gesture handlers
 
-    private var swipeGesture: some Gesture {
-        DragGesture(minimumDistance: 12)
-            .updating($dragStart) { _, state, _ in
-                // Capture the latch state on this gesture's first event
-                // so `onEnded` can branch on where the drag began.
-                // SwiftUI keeps `state` populated for the gesture's
-                // lifetime and clears it after `onEnded` returns.
-                if state == nil { state = latched }
+    /// Called for every `.changed` event from the UIKit-bridged pan
+    /// recognizer. Translation is the raw horizontal offset since the
+    /// pan started.
+    private func handlePanChanged(_ dx: CGFloat) {
+        if dragStartLatch == nil { dragStartLatch = latched }
+        translation = dx
+        fireHapticOnPhaseChange()
+    }
+
+    /// `.ended` / `.cancelled` / `.failed` from the bridged recognizer.
+    /// Same release decision tree as before.
+    private func handlePanEnded(_ dx: CGFloat) {
+        let startLatch = dragStartLatch ?? latched
+        dragStartLatch = nil
+        lastHapticPhase = 0
+
+        switch startLatch {
+        case .none:
+            // From collapsed: release latches to phase 1 or phase 2 by
+            // how far the user pulled — actions only fire when the user
+            // explicitly taps a button on the revealed strip. No
+            // implicit "pull far enough → delete" gesture.
+            if dx < -0.75 * fullWidth, phase2Width > 0 {
+                latchTo(.phase2)
+            } else if dx < -0.25 * fullWidth, phase1Width > 0 {
+                latchTo(.phase1)
+            } else {
+                animate { close() }
             }
-            .onChanged { value in
-                let dx = value.translation.width
-                let dy = value.translation.height
-                // Suppress when the user is clearly scrolling vertically.
-                if abs(dy) > abs(dx) * 1.4 { return }
-                translation = dx
-                fireHapticOnPhaseChange()
-            }
-            .onEnded { value in
-                let dx = value.translation.width
-                let startLatch = dragStart ?? latched
-                lastHapticPhase = 0
 
-                switch startLatch {
-                case .none:
-                    // From collapsed: leftward reveals the trailing
-                    // strip, with the deepest pull firing the folder's
-                    // default destructive.
-                    if dx < -0.9 * fullWidth {
-                        UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
-                        dispatch(RowAction.defaultDestructive(for: item.folder, inTrash: trashMode))
-                        return
-                    }
-                    if dx < -0.75 * fullWidth, phase2Width > 0 {
-                        latchTo(.phase2)
-                    } else if dx < -0.25 * fullWidth, phase1Width > 0 {
-                        latchTo(.phase1)
-                    } else {
-                        animate { close() }
-                    }
-
-                case .phase1:
-                    // Already at phase 1 — small rightward pull closes,
-                    // deeper leftward pull extends to phase 2. Releases
-                    // without meaningful motion keep the latch where it
-                    // was (no accidental fires).
-                    if dx > 50 {
-                        animate { close() }
-                    } else if dx < -0.5 * phase2Width, phase2Width > 0 {
-                        latchTo(.phase2)
-                    } else {
-                        animate {
-                            translation = 0
-                            latched = .phase1
-                        }
-                    }
-
-                case .phase2:
-                    // Already fully open. Right-ward release pulls back
-                    // toward phase 1 or closed; anything else holds.
-                    // No destructive fire from this state — tapping a
-                    // button is the explicit commit path.
-                    if dx > 0.5 * fullWidth {
-                        animate { close() }
-                    } else if dx > 50 {
-                        latchTo(.phase1)
-                    } else {
-                        animate {
-                            translation = 0
-                            latched = .phase2
-                        }
-                    }
+        case .phase1:
+            if dx > 50 {
+                animate { close() }
+            } else if dx < -0.5 * phase2Width, phase2Width > 0 {
+                latchTo(.phase2)
+            } else {
+                animate {
+                    translation = 0
+                    latched = .phase1
                 }
             }
-    }
 
-    /// One-line preview rendered under the lifted row while a drag is in
-    /// flight. Falls back to a generic label when the item has no note
-    /// text (e.g. attachment-only items).
-    private var dragPreviewText: String {
-        let payload = ItemPayload.decode(item.payload)
-        if !payload.note.isEmpty { return payload.note }
-        if let label = payload.attachments.first?.displayLabel, !label.isEmpty {
-            return label
-        }
-        return "Item"
-    }
-
-    /// Accept a row-id drop and place the dragged item before this one.
-    /// Same-row drops and malformed payloads are silently ignored so the
-    /// system doesn't render a "drop accepted" affordance for no-ops.
-    private func handleDrop(_ dropped: [String]) -> Bool {
-        var accepted = false
-        for str in dropped {
-            guard let droppedId = UUID(uuidString: str),
-                  droppedId != item.id else { continue }
-            let targetId = item.id
-            Task { @MainActor in
-                try? await repository.reorder(id: droppedId, before: targetId)
+        case .phase2:
+            if dx > 0.5 * fullWidth {
+                animate { close() }
+            } else if dx > 50 {
+                latchTo(.phase1)
+            } else {
+                animate {
+                    translation = 0
+                    latched = .phase2
+                }
             }
-            accepted = true
         }
-        return accepted
     }
 
     private func latchTo(_ newLatch: Latch) {
@@ -325,8 +253,7 @@ struct RowSwipeContainer<Content: View>: View {
     private func fireHapticOnPhaseChange() {
         let phase: Int
         let pct = trailingFraction
-        if pct >= 0.9 { phase = 3 }
-        else if pct >= 0.75 { phase = 2 }
+        if pct >= 0.75 { phase = 2 }
         else if pct >= 0.25 { phase = 1 }
         else { phase = 0 }
         if phase != lastHapticPhase {

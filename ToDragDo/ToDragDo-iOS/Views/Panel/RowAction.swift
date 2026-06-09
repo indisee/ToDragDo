@@ -89,9 +89,9 @@ enum RowAction: Hashable, Identifiable {
 
     /// Phase-1 actions display first as the user swipes; phase-2 adds the
     /// less-common destinations and edit/date/project triggers. Order is
-    /// also the rendering order (leftmost = revealed last). The rightmost
-    /// primary action is the default destructive — fired on full-pull
-    /// release past -90%.
+    /// also the rendering order (leftmost = revealed last). Actions fire
+    /// only on explicit button taps — there is no implicit full-pull
+    /// trigger.
     static func actions(for folder: Folder, phase: Phase, inTrash: Bool = false) -> [RowAction] {
         if inTrash {
             switch phase {
@@ -109,14 +109,6 @@ enum RowAction: Hashable, Identifiable {
         case (.done, .primary):       return [.delete]
         case (.done, .secondary):     return [.moveToToday, .moveToTomorrow, .moveToLimbo, .edit, .assignProject]
         }
-    }
-
-    /// The action fired when a trailing swipe is released past the
-    /// destructive threshold (≈-90% pull). Convention: rightmost primary
-    /// action — every folder's primary set ends with the destructive op
-    /// (`.delete` / `.purge`).
-    static func defaultDestructive(for folder: Folder, inTrash: Bool = false) -> RowAction {
-        actions(for: folder, phase: .primary, inTrash: inTrash).last ?? .delete
     }
 
 }

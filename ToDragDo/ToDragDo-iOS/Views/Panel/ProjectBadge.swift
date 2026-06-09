@@ -30,16 +30,32 @@ struct ProjectBadge: View {
     @State private var showingPicker = false
 
     var body: some View {
-        Button(action: tap) { chipLabel }
-            .buttonStyle(.plain)
-            .accessibilityLabel(tooltip)
-            .popover(isPresented: $showingPicker, arrowEdge: popoverEdge) {
-                ProjectPickerPopover(behavior: behavior) {
-                    showingPicker = false
-                }
-                .environment(repository)
-                .presentationCompactAdaptation(.popover)
+        Button(action: tap) {
+            chipLabel
+                .frame(minWidth: hitTargetSize, minHeight: hitTargetSize)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(tooltip)
+        .popover(isPresented: $showingPicker, arrowEdge: popoverEdge) {
+            ProjectPickerPopover(behavior: behavior) {
+                showingPicker = false
             }
+            .environment(repository)
+            .presentationCompactAdaptation(.popover)
+        }
+    }
+
+    /// Minimum hit target. `.square` / `.named` live in the toolbar /
+    /// input bar where the chip is visually small (14pt square or a
+    /// pill) but the surrounding empty space looks tappable — fill it.
+    /// `.dot` is the small in-row corner overlay; keeping it tight so it
+    /// doesn't swallow taps meant for the row body or note text.
+    private var hitTargetSize: CGFloat {
+        switch style {
+        case .dot:            return 16
+        case .square, .named: return 44
+        }
     }
 
     private var popoverEdge: Edge {

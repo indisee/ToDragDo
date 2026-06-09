@@ -32,7 +32,7 @@ struct RootView: View {
                 .tabItem { Label("Done", systemImage: "checkmark.circle") }
                 .tag(Tab.done)
 
-            MoreTabStub()
+            MoreView()
                 .tabItem { Label("More", systemImage: "ellipsis.circle") }
                 .tag(Tab.more)
         }
@@ -62,19 +62,16 @@ struct RootView: View {
         }
     }
 
-    /// `Tab` mirrors `Folder` for the four list tabs and adds `.more` for
-    /// the settings hub. The binding flips `PanelState.selectedFolder`
-    /// when the user picks one of the four folder tabs; the More tab
-    /// leaves `selectedFolder` untouched (it lives outside the
-    /// expanded-row / list-filter axis the panel state describes).
+    /// Drives the bottom tab bar off `PanelState.selectedTab` — the
+    /// canonical store. `selectedTab.didSet` propagates folder picks
+    /// down into `selectedFolder`; the More tab leaves it untouched.
+    /// Deriving the tab from `selectedFolder` alone would lose `.more`
+    /// across re-renders (appearance change, settings-pane mutation)
+    /// and snap the user back to a folder tab.
     private var tabBinding: Binding<Tab> {
         Binding(
-            get: { Tab(folder: panelState.selectedFolder) },
-            set: { tab in
-                if let folder = tab.folder {
-                    panelState.selectedFolder = folder
-                }
-            }
+            get: { panelState.selectedTab },
+            set: { panelState.selectedTab = $0 }
         )
     }
 }

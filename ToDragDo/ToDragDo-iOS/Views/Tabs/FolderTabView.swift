@@ -10,6 +10,8 @@ struct FolderTabView: View {
     @State private var summaryMode: SummaryMode?
     @State private var summaryState = SummaryWindowState(mode: .day)
     @Environment(PanelState.self) private var panelState
+    @Environment(AppSettings.self) private var settings
+    @Environment(ScreenCaptureMonitor.self) private var captureMonitor
 
     var body: some View {
         NavigationStack {
@@ -18,15 +20,23 @@ struct FolderTabView: View {
                     .padding(.horizontal, 12)
                     .padding(.top, 8)
                     .padding(.bottom, 8)
-                if folder == .done {
-                    DoneSummaryRow { mode in
-                        summaryState.reset(to: mode)
-                        summaryMode = mode
+                if hideForCapture {
+                    Text("List hidden — sharing screen.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .padding(.horizontal, 16)
+                } else {
+                    if folder == .done {
+                        DoneSummaryRow { mode in
+                            summaryState.reset(to: mode)
+                            summaryMode = mode
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 8)
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 8)
+                    ItemListView(folder: folder)
                 }
-                ItemListView(folder: folder)
             }
             .navigationTitle(folder.title)
             .navigationBarTitleDisplayMode(.inline)
@@ -48,6 +58,12 @@ struct FolderTabView: View {
                     .presentationDetents([.large])
             }
         }
+    }
+}
+
+private extension FolderTabView {
+    var hideForCapture: Bool {
+        settings.hideFromScreenSharing && captureMonitor.isCaptured
     }
 }
 
