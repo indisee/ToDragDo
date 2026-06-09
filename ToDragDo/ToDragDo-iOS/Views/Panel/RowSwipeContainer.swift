@@ -33,6 +33,9 @@ struct RowSwipeContainer<Content: View>: View {
     @State private var lastHapticPhase: Int = 0
     @State private var assignDateSheet: Bool = false
     @State private var assignProjectSheet: Bool = false
+    /// True while another row is being dragged over this one — used to
+    /// render the "drop will land here" indicator at the top edge.
+    @State private var isDropTarget: Bool = false
     /// Captured at the start of each gesture (first `onChanged` call) and
     /// read in `onEnded`. Decision logic must key off the starting latch
     /// because "where the user dragged from" determines what a release
@@ -117,6 +120,34 @@ struct RowSwipeContainer<Content: View>: View {
                     }
                 }
                 .offset(x: offset)
+                // Long-press drag for reorder. iOS gates `.draggable`
+                // on a system long-press, so it doesn't fight the
+                // quick-swipe `DragGesture` (short pull = reveal
+                // actions; hold first = lift the row to reorder).
+                .draggable(item.id.uuidString) {
+                    Text(dragPreviewText)
+                        .font(.system(size: 14, weight: .medium))
+                        .lineLimit(1)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.thickMaterial, in: RoundedRectangle(cornerRadius: 10))
+                }
+                .dropDestination(for: String.self) { dropped, _ in
+                    handleDrop(dropped)
+                } isTargeted: { hovering in
+                    isDropTarget = hovering
+                }
+                .overlay(alignment: .top) {
+                    // Accent bar above the row while a drag hovers it —
+                    // the drop lands the item directly before this row,
+                    // so the bar sits at the leading edge of where it
+                    // will appear.
+                    if isDropTarget {
+                        Rectangle()
+                            .fill(theme.accent)
+                            .frame(height: 3)
+                    }
+                }
                 // Gesture only on the content layer so the trailing
                 // action strip's button taps don't compete with it.
                 // `.simultaneousGesture` lets the DragGesture coexist
@@ -252,6 +283,35 @@ struct RowSwipeContainer<Content: View>: View {
                     }
                 }
             }
+    }
+
+    /// One-line preview rendered under the lifted row while a drag is in
+    /// flight. Falls back to a generic label when the item has no note
+    /// text (e.g. attachment-only items).
+    private var dragPreviewText: String {
+        let payload = ItemPayload.decode(item.payload)
+        if !payload.note.isEmpty { return payload.note }
+        if let label = payload.attachments.first?.displayLabel, !label.isEmpty {
+            return label
+        }
+        return "Item"
+    }
+
+    /// Accept a row-id drop and place the dragged item before this one.
+    /// Same-row drops and malformed payloads are silently ignored so the
+    /// system doesn't render a "drop accepted" affordance for no-ops.
+    private func handleDrop(_ dropped: [String]) -> Bool {
+        var accepted = false
+        for str in dropped {
+            guard let droppedId = UUID(uuidString: str),
+                  droppedId != item.id else { continue }
+            let targetId = item.id
+            Task { @MainActor in
+                try? await repository.reorder(id: droppedId, before: targetId)
+            }
+            accepted = true
+        }
+        return accepted
     }
 
     private func latchTo(_ newLatch: Latch) {

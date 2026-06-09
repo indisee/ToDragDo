@@ -15,8 +15,6 @@ struct RootView: View {
         .publisher(for: .todragdoCloudKitPush)
 
     var body: some View {
-        @Bindable var bound = panelState
-
         TabView(selection: tabBinding) {
             FolderTabView(folder: .today)
                 .tabItem { Label("Today", systemImage: "sun.max") }
@@ -78,28 +76,5 @@ struct RootView: View {
                 }
             }
         )
-    }
-
-    enum Tab: Hashable {
-        case today, tomorrow, limbo, done, more
-
-        init(folder: Folder) {
-            switch folder {
-            case .today:    self = .today
-            case .tomorrow: self = .tomorrow
-            case .libmo:    self = .limbo
-            case .done:     self = .done
-            }
-        }
-
-        var folder: Folder? {
-            switch self {
-            case .today:    .today
-            case .tomorrow: .tomorrow
-            case .limbo:    .libmo
-            case .done:     .done
-            case .more:     nil
-            }
-        }
     }
 }
