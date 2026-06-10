@@ -20,18 +20,22 @@ struct RootView: View {
         TabView(selection: tabBinding) {
             FolderTabView(folder: .today)
                 .tabItem { Label("Today", systemImage: "sun.max") }
+                .badge(filteredCount(.today))
                 .tag(Tab.today)
 
             FolderTabView(folder: .tomorrow)
                 .tabItem { Label("Tomorrow", systemImage: "arrow.right.circle.fill") }
+                .badge(filteredCount(.tomorrow))
                 .tag(Tab.tomorrow)
 
             FolderTabView(folder: .libmo)
                 .tabItem { Label("Limbo", systemImage: "tray.circle.fill") }
+                .badge(filteredCount(.libmo))
                 .tag(Tab.limbo)
 
             FolderTabView(folder: .done)
                 .tabItem { Label("Done", systemImage: "checkmark.circle") }
+                .badge(filteredCount(.done))
                 .tag(Tab.done)
 
             MoreView()
@@ -70,6 +74,17 @@ struct RootView: View {
                 defaults: AppGroup.defaults
             )
             await installer.installIfNeeded()
+        }
+    }
+
+    /// Count of items in `folder` respecting the active project filter.
+    /// `.badge(0)` renders nothing, so empty folders stay clean.
+    private func filteredCount(_ folder: Folder) -> Int {
+        let items = repository.items[folder] ?? []
+        let filter = panelState.filterProjectIds
+        guard !filter.isEmpty else { return items.count }
+        return items.reduce(into: 0) { acc, item in
+            if filter.contains(item.projectId) { acc += 1 }
         }
     }
 
