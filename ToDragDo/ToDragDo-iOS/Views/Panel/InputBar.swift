@@ -19,6 +19,17 @@ struct InputBar: View {
     private var isEditing: Bool { panelState.editingItemId != nil }
 
     @FocusState private var isFieldFocused: Bool
+    /// Set during the brief false→true focus toggle the widget path
+    /// performs to force the keyboard to re-present when the field was
+    /// already logically focused (e.g. user had focus, minimized, taps
+    /// the widget). Suppresses the transient `!focused` event so it
+    /// doesn't clear `widgetInputMode` before the keyboard reappears.
+    @State private var suppressDefocusClear = false
+    /// Most recent `focusInputBarRequest` token this InputBar already
+    /// acted on. Switching tabs mounts a fresh InputBar that missed
+    /// the `.onChange` for an earlier token; `.onAppear` consults this
+    /// to catch up without re-firing on every render.
+    @State private var lastHandledFocusToken: UUID?
 
     var body: some View {
         @Bindable var state = panelState
@@ -33,6 +44,24 @@ struct InputBar: View {
                     .onSubmit { Task { await submit() } }
                     .onChange(of: panelState.editingItemId) { _, newValue in
                         if newValue != nil { isFieldFocused = true }
+                    }
+                    .onChange(of: panelState.focusInputBarRequest) { _, _ in
+                        applyPendingFocusIfNeeded()
+                    }
+                    .onAppear {
+                        // Fresh InputBar mount (e.g. widget switched tabs)
+                        // missed the .onChange fire — replay any pending
+                        // focus request now that the view exists.
+                        applyPendingFocusIfNeeded()
+                    }
+                    .onChange(of: isFieldFocused) { _, focused in
+                        // Widget-driven quick-add hides the list while the
+                        // field is focused; clearing the flag the moment
+                        // focus is lost (return, tap-out, swipe-down)
+                        // brings the list back.
+                        if !focused && !suppressDefocusClear {
+                            panelState.widgetInputMode = false
+                        }
                     }
                 ProjectBadge(behavior: badgeBehavior, style: .named)
             }
@@ -95,6 +124,34 @@ struct InputBar: View {
             Image(systemName: panelState.pendingAttachments.isEmpty ? "plus" : "paperclip")
                 .font(.system(size: theme.bodySize, weight: .medium))
                 .foregroundStyle(.secondary)
+        }
+    }
+
+    /// Force-cycle `@FocusState` to re-present the keyboard. SwiftUI is
+    /// a no-op when @FocusState is set to its current value, and the
+    /// system can drop the keyboard on background without flipping the
+    /// logical focus — so we drop focus, then bounce it back on the
+    /// next tick. The token guard makes this safe to call from both
+    /// `.onChange` and `.onAppear`.
+    ///
+    /// Consumes the token by clearing `focusInputBarRequest` after
+    /// reading it — so subsequent InputBar mounts (manual tab switch
+    /// after a widget tap, settings back-nav) don't re-fire the dance
+    /// against a stale value.
+    private func applyPendingFocusIfNeeded() {
+        guard let token = panelState.focusInputBarRequest else { return }
+        guard token != lastHandledFocusToken else { return }
+        lastHandledFocusToken = token
+        panelState.focusInputBarRequest = nil
+
+        suppressDefocusClear = true
+        isFieldFocused = false
+        Task { @MainActor in
+            isFieldFocused = true
+            // One more yield so any pending focus events settle before
+            // we re-arm the defocus handler.
+            await Task.yield()
+            suppressDefocusClear = false
         }
     }
 

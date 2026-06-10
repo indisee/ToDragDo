@@ -13,11 +13,44 @@
 		A926450C2FAEBBAD0085F688 /* ToDragDoCore in Frameworks */ = {isa = PBXBuildFile; productRef = A92645092FAEBBAD0085F688 /* ToDragDoCore */; };
 		A926450D2FAEBBAD0085F688 /* ToDragDoSync in Frameworks */ = {isa = PBXBuildFile; productRef = A926450A2FAEBBAD0085F688 /* ToDragDoSync */; };
 		A926450E2FAEBBAD0085F688 /* ToDragDoContentTypes in Frameworks */ = {isa = PBXBuildFile; productRef = A926450B2FAEBBAD0085F688 /* ToDragDoContentTypes */; };
+		A92655432FD9B7030085F688 /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A92655422FD9B7030085F688 /* WidgetKit.framework */; };
+		A92655452FD9B7030085F688 /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = A92655442FD9B7030085F688 /* SwiftUI.framework */; };
+		A92655562FD9B7040085F688 /* ToDragDoWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = A92655402FD9B7030085F688 /* ToDragDoWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		B92647002FAEBBAD0085F688 /* ToDragDoIntents in Frameworks */ = {isa = PBXBuildFile; productRef = B92647012FAEBBAD0085F688 /* ToDragDoIntents */; };
+		C92648002FAEBBAD0085F688 /* ToDragDoCore in Frameworks */ = {isa = PBXBuildFile; productRef = C92648102FAEBBAD0085F688 /* ToDragDoCore */; };
+		C92648012FAEBBAD0085F688 /* ToDragDoIntents in Frameworks */ = {isa = PBXBuildFile; productRef = C92648112FAEBBAD0085F688 /* ToDragDoIntents */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A92655542FD9B7040085F688 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A92643F72FAEBBAD0085F688 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A926553F2FD9B7030085F688;
+			remoteInfo = ToDragDoWidgetsExtension;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		A92655572FD9B7040085F688 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A92655562FD9B7040085F688 /* ToDragDoWidgetsExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		A92643FF2FAEBBAD0085F688 /* ToDragDo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ToDragDo.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A92645002FAEBBAD0085F688 /* ToDragDo-iOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "ToDragDo-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		A92655402FD9B7030085F688 /* ToDragDoWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ToDragDoWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		A92655422FD9B7030085F688 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
+		A92655442FD9B7030085F688 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -27,6 +60,13 @@
 				Info.plist,
 			);
 			target = A92645012FAEBBAD0085F688 /* ToDragDo-iOS */;
+		};
+		A926555B2FD9B7040085F688 /* Exceptions for "ToDragDoWidgets" folder in "ToDragDoWidgetsExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = A926553F2FD9B7030085F688 /* ToDragDoWidgetsExtension */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -42,6 +82,14 @@
 				A92645402FAEBBAD0085F688 /* Exceptions for "ToDragDo-iOS" folder in "ToDragDo-iOS" target */,
 			);
 			path = "ToDragDo-iOS";
+			sourceTree = "<group>";
+		};
+		A92655462FD9B7030085F688 /* ToDragDoWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				A926555B2FD9B7040085F688 /* Exceptions for "ToDragDoWidgets" folder in "ToDragDoWidgetsExtension" target */,
+			);
+			path = ToDragDoWidgets;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -64,6 +112,18 @@
 				A926450C2FAEBBAD0085F688 /* ToDragDoCore in Frameworks */,
 				A926450D2FAEBBAD0085F688 /* ToDragDoSync in Frameworks */,
 				A926450E2FAEBBAD0085F688 /* ToDragDoContentTypes in Frameworks */,
+				B92647002FAEBBAD0085F688 /* ToDragDoIntents in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A926553D2FD9B7030085F688 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A92655452FD9B7030085F688 /* SwiftUI.framework in Frameworks */,
+				A92655432FD9B7030085F688 /* WidgetKit.framework in Frameworks */,
+				C92648002FAEBBAD0085F688 /* ToDragDoCore in Frameworks */,
+				C92648012FAEBBAD0085F688 /* ToDragDoIntents in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -75,6 +135,8 @@
 			children = (
 				A92644012FAEBBAD0085F688 /* ToDragDo */,
 				A92645052FAEBBAD0085F688 /* ToDragDo-iOS */,
+				A92655462FD9B7030085F688 /* ToDragDoWidgets */,
+				A92655412FD9B7030085F688 /* Frameworks */,
 				A92644002FAEBBAD0085F688 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -84,8 +146,18 @@
 			children = (
 				A92643FF2FAEBBAD0085F688 /* ToDragDo.app */,
 				A92645002FAEBBAD0085F688 /* ToDragDo-iOS.app */,
+				A92655402FD9B7030085F688 /* ToDragDoWidgetsExtension.appex */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A92655412FD9B7030085F688 /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				A92655422FD9B7030085F688 /* WidgetKit.framework */,
+				A92655442FD9B7030085F688 /* SwiftUI.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -123,10 +195,12 @@
 				A92645022FAEBBAD0085F688 /* Sources */,
 				A92645032FAEBBAD0085F688 /* Frameworks */,
 				A92645042FAEBBAD0085F688 /* Resources */,
+				A92655572FD9B7040085F688 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				A92655552FD9B7040085F688 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A92645052FAEBBAD0085F688 /* ToDragDo-iOS */,
@@ -136,10 +210,35 @@
 				A92645092FAEBBAD0085F688 /* ToDragDoCore */,
 				A926450A2FAEBBAD0085F688 /* ToDragDoSync */,
 				A926450B2FAEBBAD0085F688 /* ToDragDoContentTypes */,
+				B92647012FAEBBAD0085F688 /* ToDragDoIntents */,
 			);
 			productName = "ToDragDo-iOS";
 			productReference = A92645002FAEBBAD0085F688 /* ToDragDo-iOS.app */;
 			productType = "com.apple.product-type.application";
+		};
+		A926553F2FD9B7030085F688 /* ToDragDoWidgetsExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A926555A2FD9B7040085F688 /* Build configuration list for PBXNativeTarget "ToDragDoWidgetsExtension" */;
+			buildPhases = (
+				A926553C2FD9B7030085F688 /* Sources */,
+				A926553D2FD9B7030085F688 /* Frameworks */,
+				A926553E2FD9B7030085F688 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				A92655462FD9B7030085F688 /* ToDragDoWidgets */,
+			);
+			name = ToDragDoWidgetsExtension;
+			packageProductDependencies = (
+				C92648102FAEBBAD0085F688 /* ToDragDoCore */,
+				C92648112FAEBBAD0085F688 /* ToDragDoIntents */,
+			);
+			productName = ToDragDoWidgetsExtension;
+			productReference = A92655402FD9B7030085F688 /* ToDragDoWidgetsExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -155,6 +254,9 @@
 						CreatedOnToolsVersion = 26.1;
 					};
 					A92645012FAEBBAD0085F688 = {
+						CreatedOnToolsVersion = 26.1;
+					};
+					A926553F2FD9B7030085F688 = {
 						CreatedOnToolsVersion = 26.1;
 					};
 				};
@@ -178,6 +280,7 @@
 			targets = (
 				A92643FE2FAEBBAD0085F688 /* ToDragDo */,
 				A92645012FAEBBAD0085F688 /* ToDragDo-iOS */,
+				A926553F2FD9B7030085F688 /* ToDragDoWidgetsExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -191,6 +294,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		A92645042FAEBBAD0085F688 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A926553E2FD9B7030085F688 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -214,7 +324,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		A926553C2FD9B7030085F688 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A92655552FD9B7040085F688 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A926553F2FD9B7030085F688 /* ToDragDoWidgetsExtension */;
+			targetProxy = A92655542FD9B7040085F688 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A926440A2FAEBBAF0085F688 /* Debug */ = {
@@ -404,7 +529,9 @@
 		A92645072FAEBBAD0085F688 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = "ToDragDo-iOS/ToDragDo-iOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -434,7 +561,9 @@
 		A92645082FAEBBAD0085F688 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_ENTITLEMENTS = "ToDragDo-iOS/ToDragDo-iOS.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
@@ -458,6 +587,71 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		A92655582FD9B7040085F688 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = ToDragDoWidgets/ToDragDoWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ToDragDoWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ToDragDoWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.turtle.todragdo.ios.ToDragDoWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A92655592FD9B7040085F688 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_WIDGET_BACKGROUND_COLOR_NAME = WidgetBackground;
+				CODE_SIGN_ENTITLEMENTS = ToDragDoWidgets/ToDragDoWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = ToDragDoWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = ToDragDoWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.turtle.todragdo.ios.ToDragDoWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
 		};
@@ -487,6 +681,15 @@
 			buildConfigurations = (
 				A92645072FAEBBAD0085F688 /* Debug */,
 				A92645082FAEBBAD0085F688 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A926555A2FD9B7040085F688 /* Build configuration list for PBXNativeTarget "ToDragDoWidgetsExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A92655582FD9B7040085F688 /* Debug */,
+				A92655592FD9B7040085F688 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -524,6 +727,18 @@
 		A926450B2FAEBBAD0085F688 /* ToDragDoContentTypes */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ToDragDoContentTypes;
+		};
+		B92647012FAEBBAD0085F688 /* ToDragDoIntents */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ToDragDoIntents;
+		};
+		C92648102FAEBBAD0085F688 /* ToDragDoCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ToDragDoCore;
+		};
+		C92648112FAEBBAD0085F688 /* ToDragDoIntents */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ToDragDoIntents;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

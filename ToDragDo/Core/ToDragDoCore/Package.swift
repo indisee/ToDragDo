@@ -10,7 +10,8 @@ let package = Package(
     products: [
         .library(name: "ToDragDoCore", targets: ["ToDragDoCore"]),
         .library(name: "ToDragDoSync", targets: ["ToDragDoSync"]),
-        .library(name: "ToDragDoContentTypes", targets: ["ToDragDoContentTypes"])
+        .library(name: "ToDragDoContentTypes", targets: ["ToDragDoContentTypes"]),
+        .library(name: "ToDragDoIntents", targets: ["ToDragDoIntents"])
     ],
     targets: [
         .target(
@@ -31,6 +32,14 @@ let package = Package(
         .target(
             name: "ToDragDoContentTypes",
             dependencies: ["ToDragDoCore"],
+            swiftSettings: [
+                .enableUpcomingFeature("StrictConcurrency"),
+                .enableUpcomingFeature("ExistentialAny")
+            ]
+        ),
+        .target(
+            name: "ToDragDoIntents",
+            dependencies: ["ToDragDoCore", "ToDragDoSync"],
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency"),
                 .enableUpcomingFeature("ExistentialAny")

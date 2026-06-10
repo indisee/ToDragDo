@@ -1,6 +1,7 @@
 import Foundation
 import Observation
 import ToDragDoCore
+import ToDragDoIntents
 import ToDragDoSync
 
 /// iOS variant of the macOS `AppSettings`. Same shape, three deltas:

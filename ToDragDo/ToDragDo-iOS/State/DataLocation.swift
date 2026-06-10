@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import ToDragDoIntents
 
 /// Resolves the on-disk directory where the SwiftData store lives.
 ///

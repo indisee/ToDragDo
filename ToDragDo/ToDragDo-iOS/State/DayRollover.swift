@@ -1,5 +1,6 @@
 import Foundation
 import ToDragDoCore
+import ToDragDoIntents
 import UIKit
 
 /// iOS variant of the macOS `DayRollover`. Drops `NSWorkspace.didWakeNotification`

@@ -361,9 +361,12 @@ struct ItemRow: View {
                     .fill(.red)
                     .opacity(0.10 + 0.08 * phase)
                     .overlay {
-                        if isHovered { shape.fill(theme.accent.opacity(0.06)) }
+                        if isExpanded { shape.fill(theme.accent.opacity(0.08)) }
+                        else if isHovered { shape.fill(theme.accent.opacity(0.06)) }
                     }
             }
+        } else if isExpanded {
+            shape.fill(theme.accent.opacity(0.08))
         } else if isHovered {
             shape.fill(theme.accent.opacity(0.06))
         } else {

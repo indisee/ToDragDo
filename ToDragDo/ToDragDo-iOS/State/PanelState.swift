@@ -27,6 +27,10 @@ final class PanelState {
             if let folder = selectedTab.folder, folder != selectedFolder {
                 selectedFolder = folder
             }
+            // Widget-driven quick-add mode is scoped to one input session;
+            // bailing to another tab ends it so the list comes back when
+            // the user returns to a folder tab.
+            if oldValue != selectedTab { widgetInputMode = false }
         }
     }
     var expandedItemId: UUID? = nil
@@ -39,6 +43,22 @@ final class PanelState {
     /// container observes the property and closes itself when it sees
     /// a different id (or `nil`) land.
     var latchedSwipeItemId: UUID? = nil
+
+    /// Token bumped by the deep-link handler when the input bar should
+    /// grab keyboard focus (Quick Add widget tap, future Shortcuts entry).
+    /// `InputBar` watches this with `.onChange` and sets its
+    /// `@FocusState` to `true` whenever the value changes — a fresh
+    /// `UUID()` per request makes repeats observable even when the
+    /// value would otherwise compare equal.
+    var focusInputBarRequest: UUID? = nil
+
+    /// Set true by the widget deep-link path so the folder tab hides
+    /// its list while the input bar is focused — gives the keyboard +
+    /// the field full attention for a one-shot quick-add. Cleared when
+    /// the field loses focus or the user switches tabs. Manually tapping
+    /// the input bar does NOT toggle this on, so normal in-app focus
+    /// keeps the list visible.
+    var widgetInputMode: Bool = false
 
     var inputDraft: String = ""
     var pendingAttachments: [Attachment] = []

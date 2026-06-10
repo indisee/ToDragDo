@@ -26,6 +26,12 @@ struct FolderTabView: View {
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .padding(.horizontal, 16)
+                } else if panelState.widgetInputMode {
+                    // Widget-driven quick-add: the field has focus and we
+                    // want the keyboard to dominate, not a scrolling list
+                    // behind it. Empty spacer keeps the input pinned to
+                    // the top; the list reappears when focus is lost.
+                    Spacer(minLength: 0)
                 } else {
                     if folder == .done {
                         DoneSummaryRow { mode in

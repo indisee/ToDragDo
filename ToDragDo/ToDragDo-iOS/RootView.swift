@@ -1,5 +1,6 @@
 import SwiftUI
 import ToDragDoCore
+import ToDragDoIntents
 import ToDragDoSync
 
 /// Bottom tab bar — five tabs, in the order from REQUIREMENTS-iOS.md
@@ -8,6 +9,7 @@ import ToDragDoSync
 /// fleshes out the More tab.
 struct RootView: View {
     @Environment(PanelState.self) private var panelState
+    @Environment(Repository.self) private var repository
     @Environment(SyncCoordinator.self) private var coordinator
     @Environment(\.scenePhase) private var scenePhase
 
@@ -21,11 +23,11 @@ struct RootView: View {
                 .tag(Tab.today)
 
             FolderTabView(folder: .tomorrow)
-                .tabItem { Label("Tomorrow", systemImage: "arrow.right") }
+                .tabItem { Label("Tomorrow", systemImage: "arrow.right.circle.fill") }
                 .tag(Tab.tomorrow)
 
             FolderTabView(folder: .libmo)
-                .tabItem { Label("Limbo", systemImage: "tray") }
+                .tabItem { Label("Limbo", systemImage: "tray.circle.fill") }
                 .tag(Tab.limbo)
 
             FolderTabView(folder: .done)
@@ -42,6 +44,11 @@ struct RootView: View {
             // without waiting for the next 20 s ticker fire.
             guard phase == .active else { return }
             Task { @MainActor in
+                // Drain the Action-Button "we couldn't sync ourselves"
+                // fallback flag — see IntentStorage.bestEffortSync.
+                if AppGroup.defaults.bool(forKey: AppGroup.Keys.pendingActionButtonSync) {
+                    AppGroup.defaults.removeObject(forKey: AppGroup.Keys.pendingActionButtonSync)
+                }
                 await coordinator.sync("icloud")
             }
         }
@@ -50,6 +57,10 @@ struct RootView: View {
             Task { @MainActor in
                 await coordinator.sync("icloud")
             }
+        }
+        .onOpenURL { url in
+            guard let link = DeepLink(url: url) else { return }
+            handle(link)
         }
         .task {
             // Install the CKDatabaseSubscription once per user; subsequent
@@ -68,10 +79,54 @@ struct RootView: View {
     /// Deriving the tab from `selectedFolder` alone would lose `.more`
     /// across re-renders (appearance change, settings-pane mutation)
     /// and snap the user back to a folder tab.
+    ///
+    /// Re-tapping the currently-selected folder tab focuses the input
+    /// bar (without flipping `widgetInputMode`, so the list stays
+    /// visible — only widget taps hide the list).
     private var tabBinding: Binding<Tab> {
         Binding(
             get: { panelState.selectedTab },
-            set: { panelState.selectedTab = $0 }
+            set: { newTab in
+                if newTab == panelState.selectedTab, newTab.folder != nil {
+                    panelState.focusInputBarRequest = UUID()
+                }
+                panelState.selectedTab = newTab
+            }
         )
+    }
+
+    private func handle(_ link: DeepLink) {
+        switch link {
+        case .input(let folder):
+            panelState.selectedTab = Tab(folder: folder)
+            panelState.widgetInputMode = true
+            panelState.focusInputBarRequest = UUID()
+        case .item(let id):
+            // Repository keeps folder slices; find which one holds the
+            // item so we can both switch the tab and expand it. If the
+            // item hasn't been pulled yet (cold-launch race) bail —
+            // user can re-tap the widget after the initial reload.
+            for folder in Folder.allCases {
+                guard let item = repository.items[folder]?.first(where: { $0.id == id }) else {
+                    continue
+                }
+                panelState.selectedTab = Tab(folder: folder)
+                if let projectId = item.projectId {
+                    panelState.filterProjectIds = [projectId]
+                } else {
+                    panelState.filterProjectIds = []
+                }
+                // Defer expansion: the filter change above triggers a
+                // list re-render, and setting `expandedItemId` in the
+                // same synchronous mutation block lands before the new
+                // rows are mounted — they read the cleared value (the
+                // `filterProjectIds.didSet` resets it) and stay closed.
+                // One runloop hop lets the filtered list build first.
+                Task { @MainActor in
+                    panelState.expandedItemId = id
+                }
+                return
+            }
+        }
     }
 }

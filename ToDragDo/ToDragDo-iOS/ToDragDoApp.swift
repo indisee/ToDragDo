@@ -2,7 +2,9 @@ import OSLog
 import SwiftUI
 import ToDragDoCore
 import ToDragDoContentTypes
+import ToDragDoIntents
 import ToDragDoSync
+import WidgetKit
 
 @main
 struct ToDragDoApp: App {
@@ -20,7 +22,7 @@ struct ToDragDoApp: App {
     @State private var captureMonitor: ScreenCaptureMonitor
     @State private var panelState = PanelState()
 
-    static let iCloudContainerIdentifier = "iCloud.com.turtle.todragdo.sync.container"
+    static let iCloudContainerIdentifier = AppGroup.iCloudContainerIdentifier
     private static let log = Logger(subsystem: "com.turtle.todragdo", category: "Launch")
 
     init() {
@@ -61,10 +63,13 @@ struct ToDragDoApp: App {
         // Mirror the macOS post-write hook: any local mutation refreshes
         // the pending-push count and kicks an immediate iCloud sync so
         // the UI surfaces failures without waiting for the next ticker.
+        // Also nudge installed widgets so they redraw against the new
+        // store contents — no-op on the host if no widget is installed.
         repository.onWriteCallback = { [weak coordinator] in
             Task { @MainActor [weak coordinator] in
                 await coordinator?.refreshAllPendingCounts()
                 await coordinator?.sync("icloud")
+                WidgetCenter.shared.reloadAllTimelines()
             }
         }
 

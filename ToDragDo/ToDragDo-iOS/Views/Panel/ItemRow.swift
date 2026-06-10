@@ -67,9 +67,9 @@ struct ItemRow: View {
 
     private var mainRow: some View {
         contentLine
-            .padding(.leading, 24)
+            .padding(.leading, 30)
             .padding(.trailing, 16)
-            .padding(.top, isExpanded ? 10 : 8)
+            .padding(.top, isExpanded ? 13 : 8)
             .padding(.bottom, 8)
             .frame(minHeight: theme.rowHeight, alignment: isExpanded ? .top : .center)
     }
@@ -185,7 +185,7 @@ struct ItemRow: View {
                 contentTypes.resolve(attachment: attachment).fullView(for: attachment)
             }
         }
-        .padding(.leading, 24)
+        .padding(.leading, 30)
         .padding(.trailing, 16)
         .padding(.bottom, 8)
     }
@@ -204,7 +204,12 @@ struct ItemRow: View {
                 shape
                     .fill(.red)
                     .opacity(0.10 + 0.08 * phase)
+                    .overlay {
+                        if isExpanded { shape.fill(theme.accent.opacity(0.08)) }
+                    }
             }
+        } else if isExpanded {
+            shape.fill(theme.accent.opacity(0.08))
         } else {
             Color.clear
         }

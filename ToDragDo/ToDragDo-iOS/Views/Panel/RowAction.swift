@@ -28,8 +28,8 @@ enum RowAction: Hashable, Identifiable {
     var systemImage: String {
         switch self {
         case .moveToToday:    "sun.max"
-        case .moveToTomorrow: "arrow.right"
-        case .moveToLimbo:    "tray"
+        case .moveToTomorrow: "arrow.right.circle.fill"
+        case .moveToLimbo:    "tray.circle.fill"
         case .markDone:       "checkmark"
         case .delete:         "trash"
         case .restore:        "arrow.uturn.backward"
