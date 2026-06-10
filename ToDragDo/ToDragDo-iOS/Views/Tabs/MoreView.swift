@@ -6,6 +6,8 @@ import ToDragDoSync
 /// push the individual settings panes. Replaces the Phase 1 stub.
 struct MoreView: View {
     @Environment(SyncCoordinator.self) private var coordinator
+    @Environment(Repository.self) private var repository
+    @Environment(AppSettings.self) private var settings
 
     var body: some View {
         NavigationStack {
@@ -14,7 +16,11 @@ struct MoreView: View {
                     NavigationLink {
                         ProjectsSettingsView()
                     } label: {
-                        Label("Projects", systemImage: "folder")
+                        DetailRowLabel(
+                            title: "Projects",
+                            systemImage: "folder",
+                            detail: "\(repository.projects.count)"
+                        )
                     }
                     NavigationLink {
                         SyncSettingsView()
@@ -24,7 +30,11 @@ struct MoreView: View {
                     NavigationLink {
                         AppearanceSettingsView()
                     } label: {
-                        Label("Appearance", systemImage: "paintbrush")
+                        DetailRowLabel(
+                            title: "Appearance",
+                            systemImage: "paintbrush",
+                            detail: settings.appearance.displayName
+                        )
                     }
                     NavigationLink {
                         GeneralSettingsView()
@@ -37,7 +47,11 @@ struct MoreView: View {
                     NavigationLink {
                         TrashView()
                     } label: {
-                        Label("Trash", systemImage: "trash")
+                        DetailRowLabel(
+                            title: "Trash",
+                            systemImage: "trash",
+                            detail: "\(repository.trashItems.count)"
+                        )
                     }
                 }
             }
@@ -46,8 +60,31 @@ struct MoreView: View {
     }
 }
 
+/// Label with a secondary detail in the trailing slot — the standard
+/// `List` disclosure chevron still appears because `NavigationLink`
+/// inserts it. Mirrors the iOS Settings.app "Name → value" pattern.
+private struct DetailRowLabel: View {
+    let title: String
+    let systemImage: String
+    let detail: String
+
+    var body: some View {
+        HStack {
+            Label(title, systemImage: systemImage)
+            Spacer()
+            Text(detail)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+}
+
 /// Sync row carries a live last-sync caption in the trailing slot so the
-/// user can see fresh-vs-stale without drilling in.
+/// user can see fresh-vs-stale without drilling in. The caption is wrapped
+/// in a `TimelineView` so it keeps aging between SyncTicker fires (the
+/// row would otherwise only re-render when an observable mutates, which
+/// is roughly once per 20 s tick — making the user see "Just now" for
+/// most of the window).
 private struct SyncRowLabel: View {
     let status: SyncStatus?
 
@@ -55,19 +92,29 @@ private struct SyncRowLabel: View {
         HStack {
             Label("Sync", systemImage: "arrow.triangle.2.circlepath.icloud")
             Spacer()
-            Text(caption)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            TimelineView(.periodic(from: .now, by: 5)) { context in
+                Text(caption(now: context.date))
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
     }
 
-    private var caption: String {
+    private func caption(now: Date) -> String {
         guard let status else { return "" }
-        if let date = status.lastSuccess {
-            let f = RelativeDateTimeFormatter()
-            f.unitsStyle = .abbreviated
-            return f.localizedString(for: date, relativeTo: .now)
-        }
-        return "Never"
+        return relativeSyncTime(from: status.lastSuccess, now: now)
     }
+}
+
+/// Format a sync timestamp as a short relative string.
+/// Special-cases sub-3-second intervals to "Just now" — `RelativeDateTimeFormatter`
+/// with `.abbreviated` rounds tiny positive past intervals into "in 0s" right
+/// after a sync writes `lastSuccess = .now`, which reads as "in the future".
+func relativeSyncTime(from date: Date?, now: Date = .now) -> String {
+    guard let date else { return "Never" }
+    let interval = now.timeIntervalSince(date)
+    if interval < 3 { return "Just now" }
+    let f = RelativeDateTimeFormatter()
+    f.unitsStyle = .abbreviated
+    return f.localizedString(for: date, relativeTo: now)
 }

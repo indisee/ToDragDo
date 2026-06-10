@@ -180,7 +180,12 @@ private struct ProviderRows: View {
             set: onToggle
         ))
 
-        LabeledContent("Last sync", value: relative(status.lastSuccess))
+        LabeledContent("Last sync") {
+            TimelineView(.periodic(from: .now, by: 5)) { context in
+                Text(relativeSyncTime(from: status.lastSuccess, now: context.date))
+                    .foregroundStyle(.secondary)
+            }
+        }
         LabeledContent("Pending") {
             Text("\(status.pendingPushCount)")
                 .monospacedDigit()
@@ -204,12 +209,6 @@ private struct ProviderRows: View {
         }
     }
 
-    private func relative(_ date: Date?) -> String {
-        guard let date else { return "Never" }
-        let f = RelativeDateTimeFormatter()
-        f.unitsStyle = .abbreviated
-        return f.localizedString(for: date, relativeTo: .now)
-    }
 }
 
 private struct ProviderErrorRow: View {

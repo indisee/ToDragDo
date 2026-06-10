@@ -182,7 +182,12 @@ private struct ProviderRows: View {
             set: onToggle
         ))
 
-        LabeledContent("Last sync", value: relative(status.lastSuccess))
+        LabeledContent("Last sync") {
+            TimelineView(.periodic(from: .now, by: 5)) { context in
+                Text(relativeSyncTime(from: status.lastSuccess, now: context.date))
+                    .foregroundStyle(.secondary)
+            }
+        }
         LabeledContent("Pending") {
             Text("\(status.pendingPushCount)")
                 .monospacedDigit()
@@ -206,12 +211,19 @@ private struct ProviderRows: View {
         }
     }
 
-    private func relative(_ date: Date?) -> String {
-        guard let date else { return "Never" }
-        let f = RelativeDateTimeFormatter()
-        f.unitsStyle = .abbreviated
-        return f.localizedString(for: date, relativeTo: .now)
-    }
+}
+
+/// Format a sync timestamp as a short relative string.
+/// Special-cases sub-3-second intervals to "Just now" — `RelativeDateTimeFormatter`
+/// with `.abbreviated` rounds tiny positive past intervals into "in 0s" right
+/// after a sync writes `lastSuccess = .now`, which reads as "in the future".
+func relativeSyncTime(from date: Date?, now: Date = .now) -> String {
+    guard let date else { return "Never" }
+    let interval = now.timeIntervalSince(date)
+    if interval < 3 { return "Just now" }
+    let f = RelativeDateTimeFormatter()
+    f.unitsStyle = .abbreviated
+    return f.localizedString(for: date, relativeTo: now)
 }
 
 private struct ProviderErrorRow: View {
