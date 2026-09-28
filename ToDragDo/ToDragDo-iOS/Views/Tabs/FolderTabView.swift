@@ -9,6 +9,7 @@ struct FolderTabView: View {
 
     @State private var summaryMode: SummaryMode?
     @State private var summaryState = SummaryWindowState(mode: .day)
+    @Environment(Repository.self) private var repository
     @Environment(PanelState.self) private var panelState
     @Environment(AppSettings.self) private var settings
     @Environment(ScreenCaptureMonitor.self) private var captureMonitor
@@ -63,6 +64,21 @@ struct FolderTabView: View {
                     .environment(summaryState)
                     .presentationDetents([.large])
             }
+        }
+        // Applied on the tab content so only this folder's view subscribes
+        // to its own item slice + the filter — keeps `RootView` from
+        // re-rendering the whole TabView on every items mutation (every
+        // CloudKit pull would otherwise rebuild all five tabs).
+        .badge(filteredCount)
+    }
+
+    /// `.badge(0)` renders nothing, so empty folders stay clean.
+    private var filteredCount: Int {
+        let items = repository.items[folder] ?? []
+        let filter = panelState.filterProjectIds
+        guard !filter.isEmpty else { return items.count }
+        return items.reduce(into: 0) { acc, item in
+            if filter.contains(item.projectId) { acc += 1 }
         }
     }
 }
