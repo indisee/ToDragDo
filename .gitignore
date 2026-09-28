@@ -21,3 +21,6 @@ xcuserdata/
 # Editor swap files
 *.swp
 *.swo
+
+# Local build artifacts (scripts/build-dev-icloud.sh)
+Artifacts/
