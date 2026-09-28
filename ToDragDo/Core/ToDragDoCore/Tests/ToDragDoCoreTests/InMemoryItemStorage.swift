@@ -114,7 +114,10 @@ actor InMemoryItemStorage: ItemStorage {
     // MARK: - Remote apply (no outbox row)
 
     func upsertWithoutChange(_ item: Item) async throws {
-        if let existing = items[item.id], existing.updatedAt >= item.updatedAt { return }
+        if let existing = items[item.id], !Item.remoteWins(
+            remote: (item.updatedAt, item.lastEditedBy),
+            over: (existing.updatedAt, existing.lastEditedBy)
+        ) { return }
         items[item.id] = item
     }
 

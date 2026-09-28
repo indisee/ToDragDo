@@ -348,29 +348,34 @@ public final class Repository: RemoteApplier {
         try await reloadAndNotify()
     }
 
-    /// Day rollover: items left in Today move to Tomorrow, then Tomorrow
-    /// becomes the new Today. Net effect — old Today + old Tomorrow merge
-    /// into Today (old-Tomorrow first, old-Today appended), and Tomorrow
-    /// is cleared. Then any Limbo items whose `dueDate` has arrived are
-    /// promoted into Today/Tomorrow.
+    /// Day rollover: Tomorrow becomes the new Today. Old-Tomorrow items
+    /// move into Today above the existing Today items (keeping their
+    /// relative order); Today items are left untouched. Then any Limbo
+    /// items whose `dueDate` has arrived are promoted into Today/Tomorrow.
+    ///
+    /// Sync-safety: rollover is automatic, not a user edit, and often
+    /// runs on wake against stale local state (before the pull lands).
+    /// So it only writes the items it actually moves, and stamps them
+    /// with `automaticStamp` (≈ local midnight) rather than `.now` —
+    /// otherwise a laptop waking up the next morning would re-stamp its
+    /// stale copies as the newest version and overwrite every edit made
+    /// on other devices overnight.
     public func rolloverDay(
         now: Date = .now,
         calendar: Calendar = .autoupdatingCurrent
     ) async throws {
         let todays = try await storage.items(in: .today, includeDeleted: false)
-            .sorted { $0.orderKey < $1.orderKey }
         let tomorrows = try await storage.items(in: .tomorrow, includeDeleted: false)
             .sorted { $0.orderKey < $1.orderKey }
 
-        let stamp = Date.now
-        if !todays.isEmpty || !tomorrows.isEmpty {
-            var key: Double = 0
-            for item in tomorrows + todays {
-                key += 1
+        if !tomorrows.isEmpty {
+            let dayStart = calendar.startOfDay(for: now)
+            let topKey = todays.map(\.orderKey).min() ?? Double(tomorrows.count + 1)
+            for (index, item) in tomorrows.enumerated() {
                 var moved = item
                 moved.folder = .today
-                moved.orderKey = key
-                moved.updatedAt = stamp
+                moved.orderKey = topKey - Double(tomorrows.count - index)
+                moved.updatedAt = Self.automaticStamp(for: item, dayStart: dayStart)
                 moved.lastEditedBy = deviceId
                 let change = makeChange(op: .update, item: moved)
                 try await storage.upsert(moved, change: change)
@@ -379,6 +384,15 @@ public final class Repository: RemoteApplier {
 
         try await promoteScheduledItems(now: now, calendar: calendar, reloadAfter: false)
         try await reloadAndNotify()
+    }
+
+    /// `updatedAt` for writes the app makes on its own (rollover, due-date
+    /// promotion). Pinned to the start of the day the move logically
+    /// happened, so any real edit made on another device after that
+    /// still wins LWW. Nudged just past the item's current stamp so the
+    /// move itself still beats the version it was derived from.
+    static func automaticStamp(for item: Item, dayStart: Date) -> Date {
+        max(dayStart, item.updatedAt.addingTimeInterval(0.001))
     }
 
     /// Sets (or clears) `dueDate` on an item and routes it to the right
@@ -445,13 +459,12 @@ public final class Repository: RemoteApplier {
         let tomorrowItems = try await storage.items(in: .tomorrow, includeDeleted: false)
         var todayKey = todayItems.map(\.orderKey).max() ?? 0
         var tomorrowKey = tomorrowItems.map(\.orderKey).max() ?? 0
-        let stamp = Date.now
 
         for var item in toToday {
             todayKey += 1
             item.folder = .today
             item.orderKey = todayKey
-            item.updatedAt = stamp
+            item.updatedAt = Self.automaticStamp(for: item, dayStart: today)
             item.lastEditedBy = deviceId
             item.limboEnteredAt = nil
             let change = makeChange(op: .update, item: item)
@@ -461,7 +474,7 @@ public final class Repository: RemoteApplier {
             tomorrowKey += 1
             item.folder = .tomorrow
             item.orderKey = tomorrowKey
-            item.updatedAt = stamp
+            item.updatedAt = Self.automaticStamp(for: item, dayStart: today)
             item.lastEditedBy = deviceId
             item.limboEnteredAt = nil
             let change = makeChange(op: .update, item: item)

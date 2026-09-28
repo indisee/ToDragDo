@@ -55,7 +55,16 @@ struct ToDragDoApp: App {
             dataLocation: dataLocation
         )
         PanelController.shared = panelController
-        let dayRollover = DayRollover(repository: repository)
+        let dayRollover = DayRollover(
+            repository: repository,
+            prepare: { [weak accountWatcher, weak coordinator] in
+                // Pull first (best effort — offline just proceeds) so
+                // rollover sees other devices' edits. At launch the
+                // provider stays disabled until the account check lands.
+                _ = await accountWatcher?.refresh()
+                await coordinator?.syncAll()
+            }
+        )
         dayRollover.start()
         let syncTicker = SyncTicker(
             coordinator: coordinator,

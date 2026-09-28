@@ -12,15 +12,22 @@ final class DayRollover {
     private let repository: Repository
     private let calendar: Calendar
     private let defaults: UserDefaults
+    /// Runs before each rollover check — the host wires this to a sync
+    /// so rollover acts on what other devices did overnight instead of
+    /// this device's stale pre-sleep state.
+    private let prepare: (@MainActor () async -> Void)?
+    private var isRunning = false
     private var midnightTimer: Timer?
     private var foregroundObserver: (any NSObjectProtocol)?
 
     init(
         repository: Repository,
+        prepare: (@MainActor () async -> Void)? = nil,
         calendar: Calendar = .autoupdatingCurrent,
         defaults: UserDefaults = AppGroup.defaults
     ) {
         self.repository = repository
+        self.prepare = prepare
         self.calendar = calendar
         self.defaults = defaults
     }
@@ -51,6 +58,14 @@ final class DayRollover {
     }
 
     private func runIfNeeded() async {
+        // Launch, wake and the midnight timer can fire together; with the
+        // awaited `prepare` in between, two overlapping runs would both
+        // see the stale `lastSeenDay` and roll over twice.
+        guard !isRunning else { return }
+        isRunning = true
+        defer { isRunning = false }
+        await prepare?()
+
         let today = calendar.startOfDay(for: .now)
         let lastSeen = defaults.object(forKey: Keys.lastSeenDay) as? Date
 

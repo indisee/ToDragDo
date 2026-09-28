@@ -20,6 +20,16 @@ public final class SyncCoordinator {
     private var cursors: [String: SyncCursor] = [:]
     private let cursorEncoder: JSONEncoder
     private let cursorDecoder: JSONDecoder
+    /// One sync cycle per provider at a time. `CloudKitRemoteAdapter`
+    /// keeps per-call buffers (`pullBuffer`, `cycleSucceeded`), so two
+    /// overlapping cycles clobber each other — a second `pull` wipes the
+    /// records the first one already fetched, and since CKSyncEngine has
+    /// advanced its state token those records are never redelivered.
+    private var inFlight: [String: Task<Void, Never>] = [:]
+    /// Providers that got a `sync` request while a cycle was running.
+    /// The running task loops once more so the caller's request is
+    /// served by a cycle that *started* after it asked.
+    private var rerunRequested: Set<String> = []
 
     public init(applier: any RemoteApplier, defaults: UserDefaults = .standard) {
         self.applier = applier
@@ -62,7 +72,28 @@ public final class SyncCoordinator {
         }
     }
 
+    /// Runs a pull-then-push cycle for `providerId`. Concurrent calls are
+    /// coalesced: if a cycle is already running, the caller waits for it
+    /// plus one follow-up cycle instead of starting an overlapping one.
     public func sync(_ providerId: String) async {
+        if let running = inFlight[providerId] {
+            rerunRequested.insert(providerId)
+            await running.value
+            return
+        }
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            repeat {
+                self.rerunRequested.remove(providerId)
+                await self.runCycle(providerId)
+            } while self.rerunRequested.contains(providerId)
+            self.inFlight[providerId] = nil
+        }
+        inFlight[providerId] = task
+        await task.value
+    }
+
+    private func runCycle(_ providerId: String) async {
         guard let adapter = adapters[providerId] else { return }
         guard statuses.first(where: { $0.providerId == providerId })?.enabled == true else { return }
 

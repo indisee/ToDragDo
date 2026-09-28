@@ -86,3 +86,18 @@ public struct Item: Identifiable, Sendable, Codable, Hashable {
         self.limboEnteredAt = try c.decodeIfPresent(Date.self, forKey: .limboEnteredAt)
     }
 }
+
+extension Item {
+    /// Last-writer-wins comparison for remote applies: newer `updatedAt`
+    /// wins; exact ties go to the lexically greater `lastEditedBy` so all
+    /// devices resolve the same way.
+    public static func remoteWins(
+        remote: (updatedAt: Date, editedBy: String),
+        over local: (updatedAt: Date, editedBy: String)
+    ) -> Bool {
+        if remote.updatedAt != local.updatedAt {
+            return remote.updatedAt > local.updatedAt
+        }
+        return remote.editedBy > local.editedBy
+    }
+}

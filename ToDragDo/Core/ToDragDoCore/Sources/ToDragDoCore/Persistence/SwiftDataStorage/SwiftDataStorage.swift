@@ -244,9 +244,15 @@ public final class SwiftDataStorage: ItemStorage {
     public func upsertWithoutChange(_ item: Item) async throws {
         try ctx.transaction {
             if let existing = try fetchPersistedItem(id: item.id) {
-                // LWW: drop the remote write if our local copy is newer
-                // (or tied — older device echoes its own writes back).
-                if existing.updatedAt >= item.updatedAt { return }
+                // LWW: drop the remote write if our local copy is newer.
+                // Exact ties (two devices stamping the same automatic
+                // rollover at midnight) break on `lastEditedBy` so every
+                // device converges on the same copy; a same-device echo
+                // ties on both and is dropped.
+                if !Item.remoteWins(
+                    remote: (item.updatedAt, item.lastEditedBy),
+                    over: (existing.updatedAt, existing.lastEditedBy)
+                ) { return }
                 existing.apply(item)
             } else {
                 ctx.insert(PersistedItem(from: item))
