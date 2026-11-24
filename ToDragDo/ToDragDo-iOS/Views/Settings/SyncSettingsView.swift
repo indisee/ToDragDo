@@ -16,6 +16,7 @@ struct SyncSettingsView: View {
     @State private var resyncTarget: SyncStatus?
     @State private var resyncInFlight = false
     @State private var resyncSummary: String?
+    @AppStorage(ProductionMigration.summaryKey) private var productionMigrationSummary = ""
 
     var body: some View {
         Form {
@@ -49,12 +50,18 @@ struct SyncSettingsView: View {
                     } header: {
                         Text(status.displayName)
                     } footer: {
-                        if status.providerId == "icloud" {
-                            HStack(spacing: 4) {
-                                Text("Environment:")
-                                Text(CloudKitEnvironmentProbe.summary)
-                                    .monospaced()
-                                    .textSelection(.enabled)
+                        if status.providerId == CloudKitConfig.providerId {
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(spacing: 4) {
+                                    Text("Environment:")
+                                    Text(CloudKitEnvironmentProbe.summary)
+                                        .monospaced()
+                                        .textSelection(.enabled)
+                                }
+                                if !productionMigrationSummary.isEmpty {
+                                    Text("Production migration: \(productionMigrationSummary)")
+                                        .textSelection(.enabled)
+                                }
                             }
                         }
                     }
@@ -119,10 +126,10 @@ struct SyncSettingsView: View {
     }
 
     private func handleToggle(status: SyncStatus, newValue: Bool) async {
-        if status.providerId == "icloud" {
+        if status.providerId == CloudKitConfig.providerId {
             await accountWatcher.setUserPreference(newValue)
             if newValue {
-                await coordinator.sync("icloud")
+                await coordinator.sync(CloudKitConfig.providerId)
             }
         } else {
             coordinator.setEnabled(newValue, for: status.providerId)

@@ -1,4 +1,5 @@
 import Foundation
+import ToDragDoSync
 
 /// Centralizes the App Group identifier so the main app, widget extension,
 /// and any future share extension stay in sync. Matches the
@@ -11,7 +12,7 @@ public enum AppGroup {
     /// entitlement; centralized here so the widget extension and any
     /// future intent target don't redefine it.
     public nonisolated static let iCloudContainerIdentifier =
-        "iCloud.com.turtle.todragdo.sync.container"
+        CloudKitConfig.containerIdentifier
 
     /// `UserDefaults` suite shared across the app group. Returns the
     /// standard defaults as a last-resort fallback (e.g. when running

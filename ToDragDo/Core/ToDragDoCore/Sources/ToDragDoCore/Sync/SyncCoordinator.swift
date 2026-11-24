@@ -31,6 +31,13 @@ public final class SyncCoordinator {
     /// served by a cycle that *started* after it asked.
     private var rerunRequested: Set<String> = []
 
+    /// Called after each successful `pull` with the records it returned,
+    /// *before* they are applied locally, so the observer can still see
+    /// local state as it was. Awaited inside the cycle: rows the observer
+    /// appends to the outbox go out in the same cycle's push. Used by the
+    /// Development → Production migration.
+    public var pullObserver: (@MainActor (_ providerId: String, _ changes: [ChangeRecord]) async -> Void)?
+
     public init(applier: any RemoteApplier, defaults: UserDefaults = .standard) {
         self.applier = applier
         self.defaults = defaults
@@ -109,6 +116,7 @@ public final class SyncCoordinator {
         let cursor = cursors[providerId] ?? .initial
         do {
             let (changes, next) = try await adapter.pull(since: cursor)
+            await pullObserver?(providerId, changes)
             try await applier.applyRemote(changes)
             cursors[providerId] = next
             saveCursor(next, providerId: providerId)

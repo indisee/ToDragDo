@@ -5,6 +5,7 @@ import WidgetKit
 
 struct QuickAddWidgetView: View {
     @Environment(\.widgetFamily) private var family
+    @Environment(\.widgetRenderingMode) private var renderingMode
 
     var body: some View {
         switch family {
@@ -68,6 +69,7 @@ struct QuickAddWidgetView: View {
                 Image(systemName: system)
                     .font(.system(size: 14, weight: .semibold))
                     .foregroundStyle(.tint)
+                    .widgetAccentable()
                 Text(title)
                     .font(.subheadline.weight(.semibold))
                 Spacer(minLength: 0)
@@ -80,9 +82,18 @@ struct QuickAddWidgetView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(
                 RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(.background.secondary)
+                    .fill(buttonFill)
             )
             .foregroundStyle(.primary)
         }
+    }
+
+    /// Tinted / clear Home Screen modes render every pixel as a single
+    /// color keyed by alpha, so an opaque fill turns into a solid block
+    /// that swallows the label. Use a translucent fill there instead.
+    private var buttonFill: AnyShapeStyle {
+        renderingMode == .fullColor
+            ? AnyShapeStyle(.background.secondary)
+            : AnyShapeStyle(Color.primary.opacity(0.15))
     }
 }

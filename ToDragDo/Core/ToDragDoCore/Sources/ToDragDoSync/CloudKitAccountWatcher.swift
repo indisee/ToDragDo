@@ -17,7 +17,7 @@ public final class CloudKitAccountWatcher {
     private let container: CKContainer
     private let coordinator: SyncCoordinator
     private let preference: any ICloudSyncPreference
-    private let log = Logger(subsystem: "com.turtle.todragdo", category: "CloudKitAccount")
+    private let log = Logger.todragdo(category: "CloudKitAccount")
     private var observer: NSObjectProtocol?
 
     public init(
@@ -53,12 +53,12 @@ public final class CloudKitAccountWatcher {
             status = try await container.accountStatus()
         } catch {
             log.error("Failed to read CKAccountStatus: \(error.localizedDescription)")
-            coordinator.setEnabled(false, for: "icloud")
+            coordinator.setEnabled(false, for: CloudKitConfig.providerId)
             return false
         }
         let available = status == .available
         let enabled = available && preference.iCloudSyncEnabled
-        coordinator.setEnabled(enabled, for: "icloud")
+        coordinator.setEnabled(enabled, for: CloudKitConfig.providerId)
         if !available {
             log.notice("iCloud unavailable: status=\(String(describing: status))")
         }

@@ -18,12 +18,13 @@ struct ToDragDoApp: App {
     @State private var contentTypes: ContentTypeRegistry
     @State private var storageHealth: StorageHealth
     @State private var dataLocation: DataLocation
+    @State private var productionMigration: ProductionMigration
     @State private var backgroundRefresh: BackgroundRefresh
     @State private var captureMonitor: ScreenCaptureMonitor
     @State private var panelState = PanelState()
 
     static let iCloudContainerIdentifier = AppGroup.iCloudContainerIdentifier
-    private static let log = Logger(subsystem: "com.turtle.todragdo", category: "Launch")
+    private static let log = Logger.todragdo(category: "Launch")
 
     init() {
         let dataLocation = DataLocation()
@@ -42,6 +43,17 @@ struct ToDragDoApp: App {
             assetDirectory: dataLocation.cloudKitAssetDirectory
         )
         coordinator.register(cloudAdapter)
+        // First launch of a Production-signed build: back up local data
+        // and upload it to the (empty) Production database. No-op in
+        // Development builds and after it has run once.
+        let productionMigration = ProductionMigration(
+            repository: repository,
+            coordinator: coordinator,
+            backupDirectory: dataLocation.storeURL
+                .deletingLastPathComponent()
+                .appendingPathComponent("Backups", isDirectory: true)
+        )
+        productionMigration.start()
         let accountWatcher = CloudKitAccountWatcher(
             containerIdentifier: Self.iCloudContainerIdentifier,
             coordinator: coordinator,
@@ -77,7 +89,7 @@ struct ToDragDoApp: App {
         repository.onWriteCallback = { [weak coordinator] in
             Task { @MainActor [weak coordinator] in
                 await coordinator?.refreshAllPendingCounts()
-                await coordinator?.sync("icloud")
+                await coordinator?.sync(CloudKitConfig.providerId)
                 WidgetCenter.shared.reloadAllTimelines()
             }
         }
@@ -91,6 +103,7 @@ struct ToDragDoApp: App {
         _contentTypes = State(initialValue: contentTypes)
         _storageHealth = State(initialValue: health)
         _dataLocation = State(initialValue: dataLocation)
+        _productionMigration = State(initialValue: productionMigration)
         _backgroundRefresh = State(initialValue: backgroundRefresh)
         _captureMonitor = State(initialValue: ScreenCaptureMonitor())
     }

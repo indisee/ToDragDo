@@ -14,7 +14,7 @@ import UIKit
 @MainActor
 final class BackgroundRefresh {
     static let identifier = "com.turtle.todragdo.refresh"
-    private static let log = Logger(subsystem: "com.turtle.todragdo", category: "BGRefresh")
+    private static let log = Logger.todragdo(category: "BGRefresh")
 
     private let coordinator: SyncCoordinator
     private var didRegister = false

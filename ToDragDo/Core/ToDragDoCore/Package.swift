@@ -47,7 +47,7 @@ let package = Package(
         ),
         .testTarget(
             name: "ToDragDoCoreTests",
-            dependencies: ["ToDragDoCore"],
+            dependencies: ["ToDragDoCore", "ToDragDoSync"],
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency")
             ]

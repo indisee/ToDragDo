@@ -8,7 +8,7 @@ import ToDragDoSync
 ///
 /// Sizing: `NSHostingController.sizingOptions = [.preferredContentSize]`
 /// makes the controller expose SwiftUI's ideal size; `NSWindow` resizes
-/// its content area to match. Width is fixed at 420pt in `PanelView`.
+/// its content area to match. Width comes from `AppSettings.panelWidth` in `PanelView`.
 @MainActor @Observable
 final class PanelController {
     /// Set in `ToDragDoApp.init` so AppKit-scope code (the AppDelegate,
@@ -32,7 +32,7 @@ final class PanelController {
         dataLocation: DataLocation
     ) {
         let panel = FloatingPanel(
-            contentRect: NSRect(x: 0, y: 0, width: 420, height: 200),
+            contentRect: NSRect(x: 0, y: 0, width: AppSettings.defaultPanelWidth, height: 200),
             styleMask: [.borderless, .nonactivatingPanel],
             backing: .buffered,
             defer: false
@@ -149,11 +149,25 @@ final class PanelController {
 /// Also intercepts height-changing `setFrame` calls so the panel grows
 /// downward by default (top edge stays put) but flips to growing upward
 /// (bottom edge stays put) when expansion would push the panel off the
-/// bottom of the visible screen — e.g. when the user has the window
-/// docked near the bottom and expands the task list.
+/// bottom of the visible screen, or when the user has parked the panel
+/// within `bottomStickZone` of the bottom. The chosen edge is remembered
+/// until the user moves the panel, so collapsing mirrors the expansion.
 private final class FloatingPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+
+    /// Distance (pt) above the visible area's bottom edge within which
+    /// the panel counts as "at the bottom" and keeps its bottom edge
+    /// fixed on height changes.
+    private static let bottomStickZone: CGFloat = 80
+
+    /// Which edge height changes keep fixed. Set when an expansion has
+    /// to grow upward (or the user parks the panel near the bottom) and
+    /// kept until the user moves the panel, so collapses mirror it.
+    private var anchoredToBottom = false
+    /// The frame this class last produced; a mismatch means the panel
+    /// was moved by something else (a user drag) since.
+    private var lastAnchoredFrame: NSRect?
 
     override func setFrame(_ frameRect: NSRect, display flag: Bool) {
         super.setFrame(anchoredFrame(forProposed: frameRect), display: flag)
@@ -187,19 +201,23 @@ private final class FloatingPanel: NSPanel {
         let topAnchoredY = current.maxY - proposed.height
         let bottomAnchoredY = current.minY
 
-        // If the panel currently sits on the bottom edge of the visible
-        // area, it's already bottom-anchored from a prior expansion —
-        // keep it there so collapsing doesn't jump the input bar up.
-        let stickToBottom = current.minY <= visible.minY + 2
-
-        let newY: CGFloat
-        if stickToBottom {
-            newY = bottomAnchoredY
-        } else if topAnchoredY >= visible.minY {
-            newY = topAnchoredY
-        } else {
-            newY = bottomAnchoredY
+        // The anchor edge is remembered across resizes so a collapse
+        // undoes the preceding expansion from the same edge. If the frame
+        // no longer matches what we last set, the user moved the panel
+        // (or this is the first resize): re-derive the anchor from where
+        // it sits — near the bottom means the user parked it there.
+        if !Self.approximatelyEqual(lastAnchoredFrame, current) {
+            anchoredToBottom = current.minY <= visible.minY + Self.bottomStickZone
         }
+
+        // Growing downward would run off the bottom: flip to growing
+        // upward and stay bottom-anchored so the later collapse keeps the
+        // input bar in place instead of jumping it up.
+        if !anchoredToBottom, heightDelta > 0, topAnchoredY < visible.minY {
+            anchoredToBottom = true
+        }
+
+        let newY = anchoredToBottom ? bottomAnchoredY : topAnchoredY
 
         var result = NSRect(
             x: proposed.origin.x,
@@ -219,6 +237,13 @@ private final class FloatingPanel: NSPanel {
             result.origin.y = visible.minY
         }
 
+        lastAnchoredFrame = result
         return result
+    }
+
+    private static func approximatelyEqual(_ a: NSRect?, _ b: NSRect) -> Bool {
+        guard let a else { return false }
+        return abs(a.minX - b.minX) < 0.5 && abs(a.minY - b.minY) < 0.5
+            && abs(a.width - b.width) < 0.5 && abs(a.height - b.height) < 0.5
     }
 }

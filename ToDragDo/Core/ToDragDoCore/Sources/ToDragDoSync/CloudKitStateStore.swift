@@ -4,6 +4,12 @@ import Foundation
 /// Persists the opaque `CKSyncEngine.State.Serialization` (the server-state
 /// token that lets the engine resume an incremental sync) in `UserDefaults`.
 /// Stored as JSON because `Serialization` is `Codable`.
+///
+/// The state is keyed per CloudKit environment: Development and Production
+/// are separate databases, so a serialization (change tokens, zone state)
+/// captured against one must never be replayed against the other. Switching
+/// a device from a Development build to a Production build therefore starts
+/// the engine fresh instead of resuming with foreign tokens.
 @MainActor
 public final class CloudKitStateStore {
     private let key: String
@@ -11,8 +17,28 @@ public final class CloudKitStateStore {
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
 
-    public init(providerId: String = "icloud", defaults: UserDefaults = .standard) {
-        self.key = "todragdo.cloudkit.state.\(providerId)"
+    public init(
+        providerId: String = CloudKitConfig.providerId,
+        environment: String? = CloudKitEnvironmentProbe.resolved,
+        defaults: UserDefaults = .standard
+    ) {
+        let legacyKey = "todragdo.cloudkit.state.\(providerId)"
+        if let environment {
+            let key = "\(legacyKey).\(environment)"
+            // Every build before per-environment keys talked to
+            // Development, so the unsuffixed state belongs there.
+            if environment == "Development",
+               defaults.object(forKey: key) == nil,
+               let legacy = defaults.data(forKey: legacyKey) {
+                defaults.set(legacy, forKey: key)
+                defaults.removeObject(forKey: legacyKey)
+            }
+            self.key = key
+        } else {
+            // Environment unknown: keep the historical key rather than
+            // guessing.
+            self.key = legacyKey
+        }
         self.defaults = defaults
         self.encoder = JSONEncoder()
         self.decoder = JSONDecoder()

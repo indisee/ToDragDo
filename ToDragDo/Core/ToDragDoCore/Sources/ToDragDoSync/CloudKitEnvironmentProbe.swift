@@ -39,6 +39,29 @@ public enum CloudKitEnvironmentProbe {
         #endif
     }
 
+    /// Info.plist key that iOS targets fill from the per-configuration
+    /// `TODRAGDO_CLOUDKIT_ENV` build setting. It must match the
+    /// `icloud-container-environment` in that configuration's entitlements
+    /// file; iOS can't read its own entitlements at runtime, so this is the
+    /// stand-in there.
+    public static let infoPlistKey = "TDCloudKitEnvironment"
+
+    /// Environment declared in Info.plist, ignoring an unexpanded
+    /// `$(TODRAGDO_CLOUDKIT_ENV)` placeholder.
+    public static var infoPlistValue: String? {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: infoPlistKey) as? String,
+              !value.isEmpty, !value.hasPrefix("$(")
+        else { return nil }
+        return value
+    }
+
+    /// Best available answer to "which CloudKit environment does this
+    /// binary talk to": the signed entitlement on macOS, the Info.plist
+    /// value on iOS, `nil` when neither is known.
+    public static var resolved: String? {
+        entitlementValue ?? infoPlistValue
+    }
+
     public static var summary: String {
         #if os(macOS)
         switch entitlementValue {
@@ -48,6 +71,9 @@ public enum CloudKitEnvironmentProbe {
             return value
         }
         #else
+        if let value = infoPlistValue {
+            return "\(value) (from Info.plist)"
+        }
         return "not probed on iOS (CloudKit uses the signed entitlement)"
         #endif
     }

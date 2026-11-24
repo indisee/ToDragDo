@@ -49,13 +49,13 @@ struct RootView: View {
                 if AppGroup.defaults.bool(forKey: AppGroup.Keys.pendingActionButtonSync) {
                     AppGroup.defaults.removeObject(forKey: AppGroup.Keys.pendingActionButtonSync)
                 }
-                await coordinator.sync("icloud")
+                await coordinator.sync(CloudKitConfig.providerId)
             }
         }
         .onReceive(pushPublisher) { _ in
             // AppDelegate received a silent push; pull immediately.
             Task { @MainActor in
-                await coordinator.sync("icloud")
+                await coordinator.sync(CloudKitConfig.providerId)
             }
         }
         .onOpenURL { url in

@@ -13,7 +13,7 @@ import OSLog
 public final class CloudKitSubscriptionInstaller {
     public static let subscriptionID = "todragdo-private"
 
-    private let log = Logger(subsystem: "com.turtle.todragdo", category: "CKSubscription")
+    private let log = Logger.todragdo(category: "CKSubscription")
     private let container: CKContainer
     private let defaults: UserDefaults
     private let installedKey: String

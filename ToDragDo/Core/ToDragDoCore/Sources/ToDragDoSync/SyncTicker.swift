@@ -16,7 +16,7 @@ public final class SyncTicker {
     private let repository: Repository
     private let accountWatcher: CloudKitAccountWatcher?
     private let interval: TimeInterval
-    private let log = Logger(subsystem: "com.turtle.todragdo", category: "SyncTicker")
+    private let log = Logger.todragdo(category: "SyncTicker")
     private var task: Task<Void, Never>?
 
     public init(

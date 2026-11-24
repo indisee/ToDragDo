@@ -37,6 +37,17 @@ The project already maps each configuration to its own entitlements file:
 |---|---|---|---|
 | Debug | `ToDragDo/ToDragDo.entitlements` | `Development` | `development` |
 | Release | `ToDragDo/ToDragDoRelease.entitlements` | `Production` | `production` |
+| iOS Debug | `ToDragDo-iOS/ToDragDo-iOS.entitlements` | `Development` | `development` |
+| iOS Release | `ToDragDo-iOS/ToDragDo-iOS-Release.entitlements` | `Production` | `production` |
+| Widget Debug | `ToDragDoWidgets/ToDragDoWidgets.entitlements` | `Development` | `development` |
+| Widget Release | `ToDragDoWidgets/ToDragDoWidgets-Release.entitlements` | `Production` | `production` |
+
+iOS can't read its own entitlements at runtime, so the iOS app and the
+widget also carry `TDCloudKitEnvironment` in Info.plist, filled from the
+per-configuration `TODRAGDO_CLOUDKIT_ENV` build setting. Keep it equal to
+the environment in that configuration's entitlements file. If you ever
+override `CODE_SIGN_ENTITLEMENTS` on the command line for iOS, override
+`TODRAGDO_CLOUDKIT_ENV` too.
 
 A standard `Product → Archive` (Release config) automatically embeds the
 Production values. Nothing to flip by hand. If you ever add or rename
@@ -92,6 +103,17 @@ won't re-emit on their own when the build switches Dev → Prod.
 
 Options, in order of effort:
 
+- **Automatic (default).** On the first launch of a Production-signed
+  build, `ProductionMigration` waits for the first successful pull from
+  Production. Before applying it, it writes a JSON backup of all local
+  data to `Backups/pre-production-<timestamp>.json` next to the store,
+  then queues every local item and project that Production does not
+  have yet. The first device uploads everything; later devices only add
+  what they alone have, so they don't overwrite each other. The result
+  and the backup path are shown in **Settings → Sync** under the
+  environment line. Avoid launching the Production build for the first
+  time on two devices at the same moment.
+
 - **Accept the cold start.** Easiest. Your testing data was always
   disposable; release-day customers start empty anyway.
 - **Re-sync via the Settings UI.** Install the Production-signed build,
@@ -100,7 +122,13 @@ Options, in order of effort:
   current-state outbox row for every local item (including soft-deleted
   ones) and every project so the next sync cycle pushes everything to
   the new environment. Local rows are not modified; only the outbox grows.
-  Run this on each Mac after the cutover.
+  Run this on **one** device (the one with the most complete data)
+  after the cutover; the other devices pull from Production.
+  The `CKSyncEngine` state is stored per environment
+  (`todragdo.cloudkit.state.icloud.<Environment>`), so the Production
+  build starts with a clean engine state instead of replaying
+  Development tokens. The old unsuffixed key is migrated to
+  `.Development` on first launch of a Development build.
 - **Manual replay via CK Console.** Possible but tedious — the snapshot
   payload is a JSON `CKAsset`, not a flat field. Not recommended.
 

@@ -1,4 +1,5 @@
 import OSLog
+import ToDragDoCore
 import UIKit
 
 /// iOS lifecycle bridge for the SwiftUI app.
@@ -12,7 +13,7 @@ import UIKit
 ///    `application(_:didReceiveRemoteNotification:…)` has no SwiftUI
 ///    equivalent today.
 final class iOSAppDelegate: NSObject, UIApplicationDelegate {
-    private let log = Logger(subsystem: "com.turtle.todragdo", category: "AppDelegate")
+    private let log = Logger.todragdo(category: "AppDelegate")
 
     func application(
         _ application: UIApplication,

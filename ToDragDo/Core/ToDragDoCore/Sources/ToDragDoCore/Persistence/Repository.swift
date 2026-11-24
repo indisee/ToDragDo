@@ -631,6 +631,18 @@ public final class Repository: RemoteApplier {
         }
     }
 
+    /// Full snapshot of local data (every item, trashed ones included,
+    /// and every project) for a safety backup. The outbox is not part of
+    /// it: it only describes what still has to be sent somewhere.
+    public func makeBackup() async throws -> RepositoryBackup {
+        RepositoryBackup(
+            createdAt: .now,
+            deviceId: deviceId,
+            items: try await storage.allItems(),
+            projects: try await storage.projects()
+        )
+    }
+
     /// Append a fresh current-state outbox row for every local item
     /// (including soft-deleted ones). Used after switching CloudKit
     /// environments — the new destination is empty, but the existing
@@ -641,10 +653,14 @@ public final class Repository: RemoteApplier {
     /// `.update`. The local items are not mutated. Returns the number of
     /// outbox rows appended. After calling, the host should trigger a
     /// sync cycle.
+    ///
+    /// `excluding` skips entity ids the remote already has (used by the
+    /// Development → Production migration so it only fills in what is
+    /// missing instead of overwriting records another device pushed).
     @discardableResult
-    public func resyncAllItems() async throws -> Int {
-        let allItems = try await storage.allItems()
-        let allProjects = try await storage.projects()
+    public func resyncAllItems(excluding excludedIds: Set<UUID> = []) async throws -> Int {
+        let allItems = try await storage.allItems().filter { !excludedIds.contains($0.id) }
+        let allProjects = try await storage.projects().filter { !excludedIds.contains($0.id) }
         guard !allItems.isEmpty || !allProjects.isEmpty else { return 0 }
         let now = Date()
         var changes: [ChangeRecord] = []

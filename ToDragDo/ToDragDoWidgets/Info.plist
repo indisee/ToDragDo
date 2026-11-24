@@ -7,5 +7,7 @@
 		<key>NSExtensionPointIdentifier</key>
 		<string>com.apple.widgetkit-extension</string>
 	</dict>
+	<key>TDCloudKitEnvironment</key>
+	<string>$(TODRAGDO_CLOUDKIT_ENV)</string>
 </dict>
 </plist>

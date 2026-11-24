@@ -23,10 +23,10 @@ import ToDragDoCore
 /// in stage-1; the host drives sync via `SyncCoordinator.syncAll()`.
 @MainActor
 public final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineDelegate {
-    public nonisolated let providerId: String = "icloud"
+    public nonisolated let providerId: String = CloudKitConfig.providerId
     public nonisolated let displayName: String = "iCloud"
 
-    private let log = Logger(subsystem: "com.turtle.todragdo", category: "CloudKit")
+    private let log = Logger.todragdo(category: "CloudKit")
     private let container: CKContainer
     private let database: CKDatabase
     private let stateStore: CloudKitStateStore
