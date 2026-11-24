@@ -51,6 +51,8 @@ Exit criterion: `import ToDragDoCore` + `import ToDragDoSync` +
    - `com.apple.security.application-groups =
      ["group.com.turtle.todragdo"]` (used by share ext + widgets).
    - `aps-environment = development` (sync push later).
+   - Release uses `ToDragDo-iOS-Release.entitlements` (`Production` /
+     `production`); see ReleaseInstructions.md.
 3. Shared scaffolding — lift from macOS, drop AppKit pieces:
    - `AppSettings`: swap `UserDefaults.standard` →
      `UserDefaults(suiteName: "group.com.turtle.todragdo")`. Remove

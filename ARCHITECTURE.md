@@ -326,8 +326,15 @@ public final class SyncCoordinator {
     public func setEnabled(_ enabled: Bool, for providerId: String)
     public func syncAll() async
     public func sync(_ providerId: String) async
+    /// Sees each successful pull before it is applied locally.
+    public var pullObserver: (@MainActor (String, [ChangeRecord]) async -> Void)?
 }
 ```
+
+`pullObserver` is awaited inside the cycle, between `pull` and
+`applyRemote`, so the observer can still read the pre-pull local state,
+and any outbox rows it appends go out in the same cycle's push. Today
+its only user is the Development → Production migration (below).
 
 Settings binds directly to `SyncCoordinator.statuses` to render the
 per-provider status list. Toggling a provider on/off flips its
@@ -336,13 +343,16 @@ re-enabling resumes from where it stopped.
 
 ### iCloud adapter
 
-`CloudKitRemoteAdapter` (lives in the macOS app target — Apple-only):
+`CloudKitRemoteAdapter` (lives in the `ToDragDoSync` package target,
+shared by the macOS app, the iOS app and the widget extension):
 - Uses **`CKSyncEngine`** (the modern API) against the user's private
   CloudKit database.
 - Encodes `ChangeRecord` to a `CKRecord` keyed by `id`; the JSON
   `snapshot` payload is a `CKAsset` for any non-trivial size.
-- Pull cursor uses `CKSyncEngine`'s server-state token, persisted via
-  `SyncCursor.token`.
+- `CKSyncEngine`'s state serialization (server change tokens, zone
+  state) is persisted by `CloudKitStateStore` in `UserDefaults`, keyed
+  **per CloudKit environment**: `todragdo.cloudkit.state.icloud.<Environment>`.
+  `SyncCursor.token` only carries a fingerprint of it.
 - Tracks per-record success/failure during `sendChanges()` via the
   `.sentRecordZoneChanges` delegate event: `savedRecords` go into
   `cycleSucceeded`, `failedRecordSaves` go into `cycleFailed`. The
@@ -360,6 +370,66 @@ re-enabling resumes from where it stopped.
   `CloudKitAccountWatcher.refresh()` before its first `syncAll()`,
   so the initial sync doesn't no-op on the `enabled=false` default
   while the async account check is still in flight.
+
+Identifiers live in one place: `CloudKitConfig.containerIdentifier`
+and `CloudKitConfig.providerId` (`"icloud"`) in `ToDragDoSync`.
+`AppGroup.iCloudContainerIdentifier` forwards to it. Loggers use
+`Logger.todragdo(category:)` from `ToDragDoCore`.
+
+### CloudKit environments
+
+Development and Production are separate CloudKit databases; a binary
+talks to exactly one, chosen by the signed
+`com.apple.developer.icloud-container-environment` entitlement.
+
+| Target / config | Entitlements | Environment |
+|---|---|---|
+| macOS Debug | `ToDragDo/ToDragDo.entitlements` | Development |
+| macOS Release | `ToDragDo/ToDragDoRelease.entitlements` | Production |
+| iOS Debug | `ToDragDo-iOS/ToDragDo-iOS.entitlements` | Development |
+| iOS Release | `ToDragDo-iOS/ToDragDo-iOS-Release.entitlements` | Production |
+| Widget Debug | `ToDragDoWidgets/ToDragDoWidgets.entitlements` | Development |
+| Widget Release | `ToDragDoWidgets/ToDragDoWidgets-Release.entitlements` | Production |
+
+`scripts/build-dev-icloud.sh` builds macOS Release with the
+Development entitlements; `scripts/build-prod.sh` builds macOS Release
+as configured and refuses to finish unless the signed app says
+Production.
+
+`CloudKitEnvironmentProbe.resolved` tells the code which environment it
+runs in: on macOS it reads the signed entitlement
+(`SecTaskCopyValueForEntitlement`); iOS has no public API for that, so
+the iOS app and the widget carry `TDCloudKitEnvironment` in Info.plist,
+filled from the per-configuration `TODRAGDO_CLOUDKIT_ENV` build
+setting. Keep that setting equal to the entitlements file's value.
+
+Caveat: the local SwiftData store and the outbox are **not** split by
+environment. A Development and a Production build on the same device
+share data and pending outbox rows, so edits made in a Development
+build would later be pushed to Production too. Run Development builds
+only on a separate machine, user account, or simulator.
+
+### Development → Production migration
+
+`ProductionMigration` (`ToDragDoSync`) runs once, on the first launch of
+a Production build (flag `todragdo.migration.production.done`). It
+hooks `SyncCoordinator.pullObserver`; on the first successful pull,
+before the pulled records are applied, it:
+
+1. writes a `RepositoryBackup` (all items incl. trashed, all projects)
+   as JSON to `Backups/pre-production-<timestamp>.json` next to the
+   store;
+2. calls `Repository.resyncAllItems(excluding:)` with the entity ids the
+   pull returned, so only records Production doesn't have yet are
+   queued.
+
+The first device finds Production empty and uploads everything; later
+devices only add what they alone have. This matters because
+`applyRemote` overwrites local rows without a newer-wins check, so a
+blind full re-upload from a second device could clobber newer edits.
+The result and backup path are stored under
+`todragdo.migration.production.summary` and shown in Settings → Sync.
+A failure leaves the flag unset and retries on the next pull.
 
 Per-provider auth state for non-Apple backends lives in `AuthStore`
 (Keychain-backed) — same pattern as content-provider auth.
@@ -405,6 +475,16 @@ SwiftUI view tree is hosted inside the panel via `NSHostingView`.
 The window **auto-sizes to its content**: no empty space below the
 list. Achieved by computing the SwiftUI tree's `.fittingSize` and
 resizing the panel after each layout pass.
+
+`FloatingPanel` overrides `setFrame` to choose which edge stays put on
+height changes. By default the top edge is fixed and the panel grows
+down. It switches to a fixed bottom edge when growing down would run
+off the visible screen, or when the user has parked the panel within
+`bottomStickZone` (80 pt) of the bottom. The chosen edge is remembered
+(`anchoredToBottom`) until the user moves the panel (detected by the
+frame no longer matching `lastAnchoredFrame`), so a collapse mirrors
+the preceding expansion instead of jumping the input bar. The result is
+then clamped into the visible screen.
 
 ## Screen-share detection
 

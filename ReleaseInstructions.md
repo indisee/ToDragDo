@@ -1,154 +1,217 @@
 # Release Instructions
 
 Steps to ship a build that uses **Production** CloudKit. Skip any step and
-the first save on a customer's device fails with `serverRejectedRequest:
-Cannot create new type … in production schema` (or just silently shows no
-data, depending on which step you skipped).
+the first save fails with `serverRejectedRequest: Cannot create new type …
+in production schema`, or the app just shows no data.
 
-The current development setup forces the **Development** CloudKit
-environment — see `ToDragDo/ToDragDo.entitlements`
-(`com.apple.developer.icloud-container-environment = Development`). All
-local testing data lives in Development and **does not migrate** to
-Production automatically.
+Development and Production are **separate CloudKit databases**. A build
+talks to exactly one of them, chosen by the signed
+`com.apple.developer.icloud-container-environment` entitlement. Debug
+builds (and `scripts/build-dev-icloud.sh`) use Development; Release builds
+use Production. Data does not cross between them on the server; the
+one-time move happens from the local store (see
+[Data migration](#data-migration-development--production)).
 
 ---
 
 ## Pre-flight checklist (every release)
 
+### 0. Signing certificate
+
+Signing needs a valid **Apple Development** certificate for team
+`YOUR_TEAM_ID` in the login keychain. They expire after a year. Check:
+
+```sh
+security find-identity -p codesigning
+```
+
+`CSSMERR_TP_CERT_EXPIRED` or `0 valid identities found` means:
+
+1. Xcode → **Settings → Accounts** → sign in to the Apple ID again if
+   Xcode says the session expired.
+2. Select the team → **Manage Certificates…** → **+** →
+   **Apple Development**.
+3. Re-run the check; the new identity must be listed as valid.
+
+Command-line builds don't sign in for you (`-allowProvisioningUpdates`
+fails if the Xcode account session is stale).
+
 ### 1. Deploy the schema from Development to Production
 
 CloudKit refuses to auto-create record types or fields in Production. The
-schema must be promoted explicitly.
+schema must be promoted explicitly, and only the CloudKit Console can do
+that (`cktool` imports schemas into Development only).
 
-1. Open [CloudKit Console](https://icloud.developer.apple.com/dashboard/)
-2. Select container `iCloud.com.turtle.todragdo.sync.container`
-3. **Schema → Deploy Schema Changes…**
-4. Review the diff (record types, fields, indexes, security roles) and
-   confirm the deploy
+1. Open [CloudKit Console](https://icloud.developer.apple.com/) →
+   **CloudKit Database**.
+2. Select container `iCloud.com.turtle.todragdo.sync.container`.
+3. Make sure the environment switcher says **Development**.
+4. Click **Deploy Schema Changes…** (bottom of the left sidebar).
+5. Review the diff (record types, fields, indexes, security roles) and
+   confirm.
 
-Re-do this any time you change a `@Model` field, add a record type, or
-change indexes — Production schema does **not** update on its own.
+Verify: switch to **Production** → **Schema → Record Types**. Record type
+`ChangeRecord` must exist with fields `entityType`, `entityId`, `op`,
+`ts`, `deviceId`, `snapshot` (Asset) and `snapshotData` (Bytes). The zone
+`TDDChanges` is created by the app on first sync; it isn't part of the
+schema.
 
-### 2. Entitlements — already split per configuration
+Re-do the deploy any time a record type, field or index changes.
+Production schema does **not** update on its own.
 
-The project already maps each configuration to its own entitlements file:
+### 2. Entitlements — split per configuration
 
-| Configuration | Entitlements file | `icloud-container-environment` | `aps-environment` |
+| Target / config | Entitlements file | `icloud-container-environment` | `aps-environment` |
 |---|---|---|---|
-| Debug | `ToDragDo/ToDragDo.entitlements` | `Development` | `development` |
-| Release | `ToDragDo/ToDragDoRelease.entitlements` | `Production` | `production` |
+| macOS Debug | `ToDragDo/ToDragDo.entitlements` | `Development` | `development` |
+| macOS Release | `ToDragDo/ToDragDoRelease.entitlements` | `Production` | `production` |
 | iOS Debug | `ToDragDo-iOS/ToDragDo-iOS.entitlements` | `Development` | `development` |
 | iOS Release | `ToDragDo-iOS/ToDragDo-iOS-Release.entitlements` | `Production` | `production` |
 | Widget Debug | `ToDragDoWidgets/ToDragDoWidgets.entitlements` | `Development` | `development` |
 | Widget Release | `ToDragDoWidgets/ToDragDoWidgets-Release.entitlements` | `Production` | `production` |
 
+A Release build embeds the Production values automatically. When you add
+or rename a key (e.g. HealthKit), update the Debug and Release files of
+that target together.
+
 iOS can't read its own entitlements at runtime, so the iOS app and the
 widget also carry `TDCloudKitEnvironment` in Info.plist, filled from the
-per-configuration `TODRAGDO_CLOUDKIT_ENV` build setting. Keep it equal to
-the environment in that configuration's entitlements file. If you ever
-override `CODE_SIGN_ENTITLEMENTS` on the command line for iOS, override
-`TODRAGDO_CLOUDKIT_ENV` too.
+per-configuration `TODRAGDO_CLOUDKIT_ENV` build setting
+(Debug = `Development`, Release = `Production`). Keep it equal to the
+entitlements file. If you ever override `CODE_SIGN_ENTITLEMENTS` on the
+command line for iOS, override `TODRAGDO_CLOUDKIT_ENV` too.
 
-A standard `Product → Archive` (Release config) automatically embeds the
-Production values. Nothing to flip by hand. If you ever add or rename
-keys (e.g. adding HealthKit), update **both** files in lockstep.
+### 3. Build and verify the signed binary
 
-### 3. Archive and verify the signed binary
-
-After `Product → Archive`, before uploading, confirm the embedded
-entitlements:
+**macOS:**
 
 ```sh
-codesign -d --entitlements - /path/to/exported/ToDragDo.app
+./scripts/build-prod.sh
 ```
 
-Look for:
+Builds the `ToDragDo` scheme in Release, checks the embedded
+entitlements, and copies the app to
+`Artifacts/ToDragDo <timestamp>-prod/`. It stops with an error if the
+signed app doesn't say `Production`. (`scripts/build-dev-icloud.sh` is
+the Development counterpart.)
 
+**iOS:** build the `ToDragDo-iOS` scheme in the **Release** configuration
+to the device (Xcode: Edit Scheme → Run → Build Configuration = Release),
+or Archive for TestFlight.
+
+For anything built another way, check by hand:
+
+```sh
+codesign -d --entitlements - /path/to/ToDragDo.app
 ```
-com.apple.developer.icloud-container-environment → Production
-com.apple.developer.aps-environment              → production
-```
 
-If either is wrong, the archive talks to the wrong environment regardless
-of what you put in source. Re-export.
+Expect `icloud-container-environment → Production`. If it's wrong, the
+app talks to the wrong environment regardless of the source.
 
-### 4. Smoke test on a clean device / account
+`aps-environment` comes from the provisioning profile, not only from the
+entitlements file: a build signed with an **Apple Development** identity
+(what `build-prod.sh` produces) gets `development` even though the
+Release file says `production`. CloudKit data still goes to Production,
+but CloudKit's silent pushes are sent through production APNs and don't
+reach that build, so it syncs on the ticker / wake / launch instead of
+instantly. For instant push, export with Developer ID (Archive →
+Distribute App → Developer ID) or ship through the App Store/TestFlight.
 
-1. Install the signed Release build on a Mac with an iCloud account
-   that has **never** run any prior build of this app.
-2. Open **Settings → Sync**. The "iCloud environment:" line (read live
-   from the signed binary by `CloudKitEnvironmentProbe`) must say
-   `Production`.
-3. Create an item. Within ~20 s `Pending` should reach 0 with no error
-   in the red box.
-4. Install the same build on a second device with the same iCloud
-   account. The item should appear within ~20 s of launch.
+### 4. Smoke test
 
-If `Pending` stays > 0 with a CKError shown, copy the full red-box text
-— it has the verbose CKError chain (code, server message, partial
-errors). The two most likely failures at this stage:
+1. Open **Settings → Sync**. The **Environment:** line must say
+   `Production` (macOS reads the signed entitlement; iOS shows
+   `Production (from Info.plist)`).
+2. Create an item. Within ~20 s `Pending` should reach 0 with no error.
+3. On a second device with the same iCloud account and a Production
+   build, the item should appear within ~20 s of launch.
+
+If `Pending` stays > 0, copy the full error text (it has the verbose
+CKError chain). Most likely causes:
 
 - **`serverRejectedRequest` / "Cannot create new type"** → step 1 wasn't
   done, or the model changed since the last deploy.
-- **`notAuthenticated`** → the test iCloud account isn't signed in on
-  the device.
+- **`notAuthenticated`** → the iCloud account isn't signed in on the
+  device.
 
 ---
 
 ## Data migration: Development → Production
 
-There is no automatic path — the outbox marks rows pushed under provider
-id `"icloud"` without distinguishing environments, so existing rows
-won't re-emit on their own when the build switches Dev → Prod.
+### Automatic (default)
 
-Options, in order of effort:
+On the first launch of a Production build, `ProductionMigration` waits
+for the first successful pull from Production. Before the pulled records
+are applied, it:
 
-- **Automatic (default).** On the first launch of a Production-signed
-  build, `ProductionMigration` waits for the first successful pull from
-  Production. Before applying it, it writes a JSON backup of all local
-  data to `Backups/pre-production-<timestamp>.json` next to the store,
-  then queues every local item and project that Production does not
-  have yet. The first device uploads everything; later devices only add
-  what they alone have, so they don't overwrite each other. The result
-  and the backup path are shown in **Settings → Sync** under the
-  environment line. Avoid launching the Production build for the first
-  time on two devices at the same moment.
+1. writes a JSON backup of all local data (items including trashed ones,
+   projects) to `Backups/pre-production-<timestamp>.json` next to the
+   store:
+   - macOS: next to the store in the data folder (`DataLocation`);
+   - iOS: inside the App Group container;
+2. queues every local item and project that Production doesn't have yet.
 
-- **Accept the cold start.** Easiest. Your testing data was always
-  disposable; release-day customers start empty anyway.
-- **Re-sync via the Settings UI.** Install the Production-signed build,
-  open **Settings → Sync**, and click **Re-sync All…** on the iCloud
-  row. This calls `Repository.resyncAllItems()`, which appends a fresh
-  current-state outbox row for every local item (including soft-deleted
-  ones) and every project so the next sync cycle pushes everything to
-  the new environment. Local rows are not modified; only the outbox grows.
-  Run this on **one** device (the one with the most complete data)
-  after the cutover; the other devices pull from Production.
-  The `CKSyncEngine` state is stored per environment
-  (`todragdo.cloudkit.state.icloud.<Environment>`), so the Production
-  build starts with a clean engine state instead of replaying
-  Development tokens. The old unsuffixed key is migrated to
-  `.Development` on first launch of a Development build.
-- **Manual replay via CK Console.** Possible but tedious — the snapshot
-  payload is a JSON `CKAsset`, not a flat field. Not recommended.
+The first device finds Production empty and uploads everything; later
+devices only add what they alone have, so they don't overwrite each
+other. It runs once per device (`todragdo.migration.production.done`).
+The result and the backup path are shown in **Settings → Sync** under the
+Environment line. If it fails, it retries on the next pull.
+
+Cutover order:
+
+1. On the Development builds, let every device finish syncing
+   (`Pending: 0`).
+2. Deploy the schema (step 1).
+3. Install the Production build on the device with the most complete
+   data first. Check Settings → Sync: Environment `Production`,
+   migration line "Uploaded N of M…", `Pending` reaches 0.
+4. Then the other devices, one at a time. Their migration line should say
+   "Production already had N records; uploaded K missing ones".
+5. Don't launch the Production build for the first time on two devices
+   at the same moment: both would upload their full copies.
+
+The `CKSyncEngine` state is stored per environment
+(`todragdo.cloudkit.state.icloud.<Environment>`), so a Production build
+starts with a clean engine state instead of replaying Development tokens.
+The old unsuffixed key is moved to `.Development` on the first launch of
+a Development build.
+
+The Development database is left untouched and serves as an archive. Do
+**not** use "Reset Development Environment" in the Console unless you
+mean to delete it.
+
+### Manual fallback
+
+- **Re-sync All…** in Settings → Sync appends a fresh outbox row for every
+  local item and project, so the next sync pushes everything. Use it on
+  **one** device only: remote records overwrite local ones without a
+  newer-wins check, so re-uploading from several devices can clobber
+  newer edits.
+- **Restore from backup:** the JSON in `Backups/` decodes as
+  `RepositoryBackup` (`RepositoryBackup.decode(from:)`). There is no
+  restore UI yet.
 
 ---
 
 ## Operational notes
 
+- **Don't mix Development and Production builds on one device.** They
+  share the same local store and outbox (same bundle id and App Group),
+  and the outbox isn't split by environment. Edits made in a Development
+  build would later be pushed to Production too, and Development data
+  would mix into the local store. After the cutover, run Development
+  builds only on a separate machine, user account, or simulator.
 - **The runtime environment is set at sign time, not at runtime.**
-  Changing `com.apple.developer.icloud-container-environment` only takes
-  effect on the next build + sign + reinstall. Verify with `codesign`.
+  Changing `icloud-container-environment` only takes effect on the next
+  build + sign + reinstall. Verify with `codesign`.
 - **APNs and CloudKit environments are independent but should match.**
   Mixing `aps-environment=production` with
-  `icloud-container-environment=Development` (or vice versa) is a
-  supported but confusing state and not worth the cognitive load.
-- **Schema deploys are one-way and additive for record types.** You can
-  add fields and record types via deploy, but you cannot remove them
-  from Production via the console — they stay in the schema forever
-  (with limited rename support). Treat Production schema changes as
-  permanent.
-- **Pushed changes never delete from the outbox.** The
-  `PersistedChange` rows accumulate forever (by design — they're the
-  authoritative log). If they ever get large enough to matter,
-  introduce a `pushedBefore` retention sweep in `Repository`.
+  `icloud-container-environment=Development` (or vice versa) works but
+  isn't worth the confusion.
+- **Schema deploys are one-way and additive.** You can add fields and
+  record types, but you can't remove them from Production. Treat
+  Production schema changes as permanent.
+- **Pushed changes never delete from the outbox.** The `PersistedChange`
+  rows accumulate forever by design (they're the authoritative log). If
+  they ever get large enough to matter, add a `pushedBefore` retention
+  sweep in `Repository`.
