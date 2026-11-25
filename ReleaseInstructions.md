@@ -18,8 +18,8 @@ one-time move happens from the local store (see
 
 ### 0. Signing certificate
 
-Signing needs a valid **Apple Development** certificate for team
-`YOUR_TEAM_ID` in the login keychain. They expire after a year. Check:
+Signing needs a valid **Apple Development** certificate for your
+team (`DEVELOPMENT_TEAM`) in the login keychain. They expire after a year. Check:
 
 ```sh
 security find-identity -p codesigning

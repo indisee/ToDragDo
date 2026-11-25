@@ -28,12 +28,22 @@ struct ToDragDoApp: App {
 
     init() {
         let dataLocation = DataLocation()
-        let outcome = StorageFactory.makeItemStorageWithRecovery(
-            url: dataLocation.storeURL
-        )
-        let storage = Self.resolveStorage(from: outcome)
-        let health = StorageHealth.from(outcome)
-        Self.logOutcome(outcome)
+        // `-DemoMode`: in-memory store with fake data and no sync, for
+        // screenshots. Never opens the real store or talks to CloudKit.
+        let demoMode = DemoData.isRequested
+        let storage: any ItemStorage
+        let health: StorageHealth
+        if demoMode {
+            storage = Self.makeDemoStorage()
+            health = StorageHealth()
+        } else {
+            let outcome = StorageFactory.makeItemStorageWithRecovery(
+                url: dataLocation.storeURL
+            )
+            storage = Self.resolveStorage(from: outcome)
+            health = StorageHealth.from(outcome)
+            Self.logOutcome(outcome)
+        }
         let repository = Repository(storage: storage)
         let settings = AppSettings()
         settings.bindToSync(repository)
@@ -42,7 +52,9 @@ struct ToDragDoApp: App {
             containerIdentifier: Self.iCloudContainerIdentifier,
             assetDirectory: dataLocation.cloudKitAssetDirectory
         )
-        coordinator.register(cloudAdapter)
+        if !demoMode {
+            coordinator.register(cloudAdapter)
+        }
         // First launch of a Production-signed build: back up local data
         // and upload it to the (empty) Production database. No-op in
         // Development builds and after it has run once.
@@ -53,7 +65,11 @@ struct ToDragDoApp: App {
                 .deletingLastPathComponent()
                 .appendingPathComponent("Backups", isDirectory: true)
         )
-        productionMigration.start()
+        if demoMode {
+            Task { @MainActor in try? await DemoData.seed(repository) }
+        } else {
+            productionMigration.start()
+        }
         let accountWatcher = CloudKitAccountWatcher(
             containerIdentifier: Self.iCloudContainerIdentifier,
             coordinator: coordinator,
@@ -106,6 +122,14 @@ struct ToDragDoApp: App {
         _productionMigration = State(initialValue: productionMigration)
         _backgroundRefresh = State(initialValue: backgroundRefresh)
         _captureMonitor = State(initialValue: ScreenCaptureMonitor())
+    }
+
+    private static func makeDemoStorage() -> any ItemStorage {
+        do {
+            return try StorageFactory.makeItemStorage(inMemory: true)
+        } catch {
+            fatalError("Demo mode: in-memory storage unavailable: \(error)")
+        }
     }
 
     private static func resolveStorage(from outcome: StorageFactory.InitOutcome) -> any ItemStorage {
