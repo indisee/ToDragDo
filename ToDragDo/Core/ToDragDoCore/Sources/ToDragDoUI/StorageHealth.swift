@@ -3,17 +3,18 @@ import Observation
 import ToDragDoCore
 
 /// User-facing description of how the local store opened at launch.
-/// Mirrors the macOS type verbatim — `StorageFactory.InitOutcome` is in
-/// `ToDragDoCore` so both platforms render the same notices.
+/// `nil` means everything was fine; non-nil values surface in Settings as
+/// a banner so the user knows their data was rescued, rebuilt, or is
+/// running ephemerally.
 @MainActor
 @Observable
-final class StorageHealth {
-    enum Notice: Sendable {
+public final class StorageHealth {
+    public enum Notice: Sendable {
         case rescued(itemCount: Int, originalError: String)
         case rebuiltEmpty(originalError: String, rescueError: String)
         case inMemoryFallback(originalError: String)
 
-        var title: String {
+        public var title: String {
             switch self {
             case .rescued: return "Database rebuilt"
             case .rebuiltEmpty: return "Database reset"
@@ -21,7 +22,7 @@ final class StorageHealth {
             }
         }
 
-        var message: String {
+        public var message: String {
             switch self {
             case .rescued(let count, let original):
                 return "Couldn't open the existing database (\(original)). Rebuilt it and recovered \(count) item\(count == 1 ? "" : "s"). The old files were preserved alongside the new store with a `.broken-…` suffix."
@@ -33,13 +34,13 @@ final class StorageHealth {
         }
     }
 
-    var notice: Notice?
+    public var notice: Notice?
 
-    init(notice: Notice? = nil) {
+    public init(notice: Notice? = nil) {
         self.notice = notice
     }
 
-    static func from(_ outcome: StorageFactory.InitOutcome) -> StorageHealth {
+    public static func from(_ outcome: StorageFactory.InitOutcome) -> StorageHealth {
         switch outcome {
         case .healthy:
             return StorageHealth(notice: nil)

@@ -1,6 +1,7 @@
 import SwiftUI
-import UniformTypeIdentifiers
 import ToDragDoCore
+import ToDragDoUI
+import UniformTypeIdentifiers
 
 /// Invisible drop target placed after the last row in `ItemList`.
 /// Lets a drag land "at the end" of the current folder, since `ItemRow`

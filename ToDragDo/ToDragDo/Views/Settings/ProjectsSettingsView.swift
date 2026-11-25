@@ -1,5 +1,6 @@
 import SwiftUI
 import ToDragDoCore
+import ToDragDoUI
 
 /// Projects pane in the Settings scene.
 ///

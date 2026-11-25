@@ -3,6 +3,7 @@ import Foundation
 import Observation
 import ToDragDoCore
 import ToDragDoSync
+import ToDragDoUI
 
 /// User-controlled app settings, persisted via UserDefaults.
 /// Single source of truth across the panel and Settings scene.

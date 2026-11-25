@@ -1,5 +1,6 @@
 import SwiftUI
 import ToDragDoCore
+import ToDragDoUI
 
 /// Compact representation of a `pendingAttachment` shown inside the
 /// `InputBar` while the user types accompanying text.

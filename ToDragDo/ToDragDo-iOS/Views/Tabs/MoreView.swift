@@ -1,6 +1,7 @@
 import SwiftUI
 import ToDragDoCore
 import ToDragDoSync
+import ToDragDoUI
 
 /// More tab — `NavigationStack` over a `List` of `NavigationLink`s that
 /// push the individual settings panes. Replaces the Phase 1 stub.

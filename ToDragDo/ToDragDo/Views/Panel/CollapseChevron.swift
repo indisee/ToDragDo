@@ -1,4 +1,5 @@
 import SwiftUI
+import ToDragDoUI
 
 /// Standalone chevron button that toggles `PanelState.isListCollapsed`.
 /// Kept outside `InputBar` so the input's visual treatment isn't affected

@@ -1,6 +1,7 @@
 import SwiftUI
-import UniformTypeIdentifiers
 import ToDragDoCore
+import ToDragDoUI
+import UniformTypeIdentifiers
 
 /// A single folder tab in the FolderTabBar.
 ///

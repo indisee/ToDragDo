@@ -1,17 +1,17 @@
-import AppKit
 import SwiftUI
+#if os(macOS)
+import AppKit
+#endif
 
 /// User-selectable appearance preference. `auto` follows the system.
-enum AppearanceMode: String, Codable, CaseIterable, Identifiable {
+public enum AppearanceMode: String, Codable, CaseIterable, Identifiable, Sendable {
     case light
     case dark
     case auto
 
-    var id: String { rawValue }
+    public var id: String { rawValue }
 
-    /// LocalizedStringKey so `Text(mode.displayName)` flows through the
-    /// string catalog instead of being treated as a verbatim string.
-    var displayName: LocalizedStringKey {
+    public var displayName: String {
         switch self {
         case .light: "Light"
         case .dark:  "Dark"
@@ -20,7 +20,7 @@ enum AppearanceMode: String, Codable, CaseIterable, Identifiable {
     }
 
     /// `nil` means "follow the system" — handed to `.preferredColorScheme(_:)`.
-    var colorScheme: ColorScheme? {
+    public var colorScheme: ColorScheme? {
         switch self {
         case .light: .light
         case .dark:  .dark
@@ -28,14 +28,17 @@ enum AppearanceMode: String, Codable, CaseIterable, Identifiable {
         }
     }
 
+    #if os(macOS)
     /// Direct AppKit binding. `nil` lets the system choose.
     /// Used to override SwiftUI's `.preferredColorScheme` which can leave
     /// chrome stuck in a previous appearance after switching to `auto`.
-    var nsAppearance: NSAppearance? {
+    @MainActor
+    public var nsAppearance: NSAppearance? {
         switch self {
         case .light: NSAppearance(named: .aqua)
         case .dark:  NSAppearance(named: .darkAqua)
         case .auto:  nil
         }
     }
+    #endif
 }

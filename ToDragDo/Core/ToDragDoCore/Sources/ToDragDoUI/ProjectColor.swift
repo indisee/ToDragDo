@@ -2,11 +2,11 @@ import SwiftUI
 import ToDragDoCore
 
 /// SwiftUI bridge for the project palette and helpers around it.
-enum ProjectColor {
+public enum ProjectColor {
     /// Suggested colors offered in the Projects settings pane when the
     /// user creates a new project. Same hex strings used for the seed
     /// projects come first so they read as the "primary" choices.
-    static let palette: [String] = [
+    public static let palette: [String] = [
         Project.workColorHex,
         Project.personalColorHex,
         "#FF6B6B", // coral
@@ -19,7 +19,7 @@ enum ProjectColor {
         "#64D2FF"  // cyan
     ]
 
-    static func color(forHex hex: String) -> Color {
+    public static func color(forHex hex: String) -> Color {
         var trimmed = hex.trimmingCharacters(in: .whitespaces)
         if trimmed.hasPrefix("#") { trimmed.removeFirst() }
         guard trimmed.count == 6, let value = UInt32(trimmed, radix: 16) else {
@@ -33,5 +33,5 @@ enum ProjectColor {
 }
 
 extension Project {
-    var color: Color { ProjectColor.color(forHex: colorHex) }
+    public var color: Color { ProjectColor.color(forHex: colorHex) }
 }

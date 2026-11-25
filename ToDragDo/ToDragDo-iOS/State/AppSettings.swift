@@ -3,6 +3,7 @@ import Observation
 import ToDragDoCore
 import ToDragDoIntents
 import ToDragDoSync
+import ToDragDoUI
 
 /// iOS variant of the macOS `AppSettings`. Same shape, three deltas:
 /// 1. `UserDefaults` is the App Group suite so the share extension /

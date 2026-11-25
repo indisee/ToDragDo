@@ -1,5 +1,6 @@
 import SwiftUI
 import ToDragDoCore
+import ToDragDoUI
 
 /// Top-of-folder input row. iOS port — keeps the same TextField + chip
 /// flow as macOS, drops the `.dropTarget` overlay (drag/drop deferred

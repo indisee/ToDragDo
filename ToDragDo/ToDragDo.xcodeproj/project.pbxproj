@@ -19,6 +19,8 @@
 		B92647002FAEBBAD0085F688 /* ToDragDoIntents in Frameworks */ = {isa = PBXBuildFile; productRef = B92647012FAEBBAD0085F688 /* ToDragDoIntents */; };
 		C92648002FAEBBAD0085F688 /* ToDragDoCore in Frameworks */ = {isa = PBXBuildFile; productRef = C92648102FAEBBAD0085F688 /* ToDragDoCore */; };
 		C92648012FAEBBAD0085F688 /* ToDragDoIntents in Frameworks */ = {isa = PBXBuildFile; productRef = C92648112FAEBBAD0085F688 /* ToDragDoIntents */; };
+		D1A0E0012FAEBBAD0085F688 /* ToDragDoUI in Frameworks */ = {isa = PBXBuildFile; productRef = D1A0E0022FAEBBAD0085F688 /* ToDragDoUI */; };
+		D1A0E0032FAEBBAD0085F688 /* ToDragDoUI in Frameworks */ = {isa = PBXBuildFile; productRef = D1A0E0042FAEBBAD0085F688 /* ToDragDoUI */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -100,6 +102,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A92644122FAEBBAD0085F688 /* ToDragDoCore in Frameworks */,
+				D1A0E0012FAEBBAD0085F688 /* ToDragDoUI in Frameworks */,
 				A92644212FAEBBAD0085F688 /* ToDragDoSync in Frameworks */,
 				A92644312FAEBBAD0085F688 /* ToDragDoContentTypes in Frameworks */,
 			);
@@ -110,6 +113,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A926450C2FAEBBAD0085F688 /* ToDragDoCore in Frameworks */,
+				D1A0E0032FAEBBAD0085F688 /* ToDragDoUI in Frameworks */,
 				A926450D2FAEBBAD0085F688 /* ToDragDoSync in Frameworks */,
 				A926450E2FAEBBAD0085F688 /* ToDragDoContentTypes in Frameworks */,
 				B92647002FAEBBAD0085F688 /* ToDragDoIntents in Frameworks */,
@@ -181,6 +185,7 @@
 			name = ToDragDo;
 			packageProductDependencies = (
 				A92644112FAEBBAD0085F688 /* ToDragDoCore */,
+				D1A0E0022FAEBBAD0085F688 /* ToDragDoUI */,
 				A92644202FAEBBAD0085F688 /* ToDragDoSync */,
 				A92644302FAEBBAD0085F688 /* ToDragDoContentTypes */,
 			);
@@ -208,6 +213,7 @@
 			name = "ToDragDo-iOS";
 			packageProductDependencies = (
 				A92645092FAEBBAD0085F688 /* ToDragDoCore */,
+				D1A0E0042FAEBBAD0085F688 /* ToDragDoUI */,
 				A926450A2FAEBBAD0085F688 /* ToDragDoSync */,
 				A926450B2FAEBBAD0085F688 /* ToDragDoContentTypes */,
 				B92647012FAEBBAD0085F688 /* ToDragDoIntents */,
@@ -554,8 +560,8 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TODRAGDO_CLOUDKIT_ENV = Development;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				TODRAGDO_CLOUDKIT_ENV = Development;
 			};
 			name = Debug;
 		};
@@ -587,8 +593,8 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TODRAGDO_CLOUDKIT_ENV = Production;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				TODRAGDO_CLOUDKIT_ENV = Production;
 			};
 			name = Release;
 		};
@@ -620,8 +626,8 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TODRAGDO_CLOUDKIT_ENV = Development;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				TODRAGDO_CLOUDKIT_ENV = Development;
 			};
 			name = Debug;
 		};
@@ -653,8 +659,8 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TODRAGDO_CLOUDKIT_ENV = Production;
 				TARGETED_DEVICE_FAMILY = "1,2";
+				TODRAGDO_CLOUDKIT_ENV = Production;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
@@ -743,6 +749,14 @@
 		C92648112FAEBBAD0085F688 /* ToDragDoIntents */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ToDragDoIntents;
+		};
+		D1A0E0022FAEBBAD0085F688 /* ToDragDoUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ToDragDoUI;
+		};
+		D1A0E0042FAEBBAD0085F688 /* ToDragDoUI */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ToDragDoUI;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

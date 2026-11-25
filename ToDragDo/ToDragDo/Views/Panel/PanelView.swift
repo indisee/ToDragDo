@@ -1,8 +1,9 @@
-import SwiftUI
 import AppKit
-import ToDragDoCore
+import SwiftUI
 import ToDragDoContentTypes
+import ToDragDoCore
 import ToDragDoSync
+import ToDragDoUI
 
 /// Root view of the always-on-top panel.
 /// Composes Input + Folder tabs + Item list. Owns no business logic;

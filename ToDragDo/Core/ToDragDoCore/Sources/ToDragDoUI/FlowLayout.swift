@@ -3,10 +3,14 @@ import SwiftUI
 /// Wraps subviews left-to-right, top-to-bottom into rows that fit the
 /// proposed width. Used by the input bar to lay out a variable number
 /// of pending-attachment chips without horizontal overflow.
-struct FlowLayout: Layout {
-    var spacing: CGFloat = 6
+public struct FlowLayout: Layout {
+    public var spacing: CGFloat
 
-    func sizeThatFits(
+    public init(spacing: CGFloat = 6) {
+        self.spacing = spacing
+    }
+
+    public func sizeThatFits(
         proposal: ProposedViewSize,
         subviews: Subviews,
         cache: inout ()
@@ -32,7 +36,7 @@ struct FlowLayout: Layout {
         return CGSize(width: maxRowWidth, height: totalHeight)
     }
 
-    func placeSubviews(
+    public func placeSubviews(
         in bounds: CGRect,
         proposal: ProposedViewSize,
         subviews: Subviews,

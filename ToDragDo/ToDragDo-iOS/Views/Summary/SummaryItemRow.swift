@@ -1,6 +1,7 @@
 import SwiftUI
-import ToDragDoCore
 import ToDragDoContentTypes
+import ToDragDoCore
+import ToDragDoUI
 
 /// Read-only row used inside the Done-summary sheet. iOS variant —
 /// same shape as macOS (which already used pure SwiftUI to dodge the

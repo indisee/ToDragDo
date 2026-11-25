@@ -1,6 +1,7 @@
 import SwiftUI
-import ToDragDoCore
 import ToDragDoContentTypes
+import ToDragDoCore
+import ToDragDoUI
 
 /// Leading per-row indicator. Two modes:
 /// - **Type**: symbol + tint resolved from the content-type registry.

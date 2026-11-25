@@ -1,7 +1,8 @@
 import SwiftUI
-import UIKit
 import ToDragDoCore
 import ToDragDoSync
+import ToDragDoUI
+import UIKit
 
 /// Sync pane (More → Sync). One row per registered provider — for now
 /// just iCloud. Mirrors the macOS pane; the only platform delta is

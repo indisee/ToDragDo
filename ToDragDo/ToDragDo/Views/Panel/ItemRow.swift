@@ -1,7 +1,8 @@
 import AppKit
 import SwiftUI
-import ToDragDoCore
 import ToDragDoContentTypes
+import ToDragDoCore
+import ToDragDoUI
 import UniformTypeIdentifiers
 
 /// A single (closed or open) item row.

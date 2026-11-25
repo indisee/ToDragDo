@@ -1,6 +1,7 @@
 import SwiftUI
 import ToDragDoCore
 import ToDragDoSync
+import ToDragDoUI
 
 /// Sync pane. Renders one row per registered provider; for now that's just
 /// iCloud. Users toggle the provider on/off, force a manual sync, and see

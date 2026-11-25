@@ -4,7 +4,7 @@ import ToDragDoCore
 /// Pure helpers that decide whether a Limbo item has crossed the
 /// user-configured idle threshold and should blink red. Centralised so
 /// the row view and the tab badge can't drift.
-enum LimboStaleness {
+public enum LimboStaleness {
     /// True when `item` lives in Limbo, has an idle timestamp, and the
     /// configured threshold (in days, > 0) has elapsed since it last
     /// reset. Items without `limboEnteredAt` (legacy rows that pre-date
@@ -14,7 +14,7 @@ enum LimboStaleness {
     /// instead — the user has signalled an intended action time, so a
     /// future date suppresses the warning entirely and a past one
     /// arms the countdown from that moment.
-    static func isStale(
+    public static func isStale(
         _ item: Item,
         threshold days: Int,
         now: Date = .now
@@ -34,7 +34,7 @@ enum LimboStaleness {
 
     /// True when any item in `items` is stale under `threshold`.
     /// `items` is expected to be the current Limbo slice.
-    static func anyStale(
+    public static func anyStale(
         in items: [Item],
         threshold days: Int,
         now: Date = .now

@@ -1,5 +1,6 @@
 import SwiftUI
 import ToDragDoCore
+import ToDragDoUI
 
 /// Compact, colored project chip that doubles as a control. Drives
 /// picking the project for new items, filtering the list, or

@@ -1,4 +1,5 @@
 import SwiftUI
+import ToDragDoUI
 
 /// Appearance pane (More → Appearance). Drives
 /// `.preferredColorScheme(_:)` on the iOS app root.

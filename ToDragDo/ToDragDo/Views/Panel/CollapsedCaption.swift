@@ -1,5 +1,6 @@
 import SwiftUI
 import ToDragDoCore
+import ToDragDoUI
 
 /// Inline caption shown next to `CollapseChevron` when the list is
 /// minimized. The chevron button itself communicates the action, so

@@ -1,5 +1,6 @@
 import SwiftUI
 import ToDragDoCore
+import ToDragDoUI
 
 /// Horizontal tab strip below the input. Drives `PanelState.selectedFolder`.
 struct FolderTabBar: View {

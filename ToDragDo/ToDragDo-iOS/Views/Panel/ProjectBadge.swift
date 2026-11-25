@@ -1,5 +1,6 @@
 import SwiftUI
 import ToDragDoCore
+import ToDragDoUI
 
 /// Compact, colored project chip that doubles as a control. Port of the
 /// macOS ProjectBadge. The picker is presented with `.popover` —

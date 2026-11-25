@@ -1,6 +1,7 @@
 import SwiftUI
-import ToDragDoCore
 import ToDragDoContentTypes
+import ToDragDoCore
+import ToDragDoUI
 
 /// A single (closed or open) item row. iOS port — Phase 2 ships tap-to-
 /// open only. Phase 3 wraps this view in `RowSwipeContainer` to add the

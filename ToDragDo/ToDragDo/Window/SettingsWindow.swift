@@ -1,8 +1,9 @@
 import AppKit
 import SwiftUI
-import ToDragDoCore
 import ToDragDoContentTypes
+import ToDragDoCore
 import ToDragDoSync
+import ToDragDoUI
 
 /// On-demand `NSWindow` for Settings.
 ///

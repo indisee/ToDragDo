@@ -1,5 +1,6 @@
 import SwiftUI
 import ToDragDoCore
+import ToDragDoUI
 
 /// Done-items review sheet. iOS variant — presented from the Done tab
 /// via `.sheet`. Top: segmented Day/Week picker, then chevron-paged

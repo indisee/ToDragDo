@@ -1,5 +1,6 @@
 import SwiftUI
 import ToDragDoCore
+import ToDragDoUI
 
 /// Projects pane (More → Projects). Lets the user rename, recolor, add,
 /// and delete projects. Deleting a project clears its items' assignments

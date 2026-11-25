@@ -1,8 +1,9 @@
 import OSLog
 import SwiftUI
-import ToDragDoCore
 import ToDragDoContentTypes
+import ToDragDoCore
 import ToDragDoSync
+import ToDragDoUI
 
 @main
 struct ToDragDoApp: App {

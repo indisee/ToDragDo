@@ -1,5 +1,6 @@
 import SwiftUI
 import ToDragDoCore
+import ToDragDoUI
 
 /// Row shown above the Done tab's item list. Tapping a pill opens the
 /// Done-summary sheet anchored on the requested period.
