@@ -1,13 +1,16 @@
 import SwiftUI
 import ToDragDoCore
 import ToDragDoSync
-import ToDragDoUI
+#if os(macOS)
+import AppKit
+#else
 import UIKit
+#endif
 
-/// Sync pane (More → Sync). One row per registered provider — for now
-/// just iCloud. Mirrors the macOS pane; the only platform delta is
-/// `UIPasteboard` in place of `NSPasteboard` for "Copy Error".
-struct SyncSettingsView: View {
+/// Sync pane (macOS Settings window; iOS More → Sync). Renders one row
+/// per registered provider; for now that's just iCloud. Users toggle the provider on/off, force a manual sync, and see
+/// the most recent attempt/success/error and pending push count.
+public struct SyncSettingsView: View {
     @Environment(Repository.self) private var repository
     @Environment(SyncCoordinator.self) private var coordinator
     @Environment(AppSettings.self) private var settings
@@ -19,7 +22,9 @@ struct SyncSettingsView: View {
     @State private var resyncSummary: String?
     @AppStorage(ProductionMigration.summaryKey) private var productionMigrationSummary = ""
 
-    var body: some View {
+    public init() {}
+
+    public var body: some View {
         Form {
             if let notice = storageHealth.notice {
                 Section {
@@ -69,8 +74,7 @@ struct SyncSettingsView: View {
                 }
             }
         }
-        .navigationTitle("Sync")
-        .navigationBarTitleDisplayMode(.inline)
+        .settingsPaneStyle(title: "Sync")
         .confirmationDialog(
             "Re-sync everything to \(resyncTarget?.displayName ?? "iCloud")?",
             isPresented: Binding(
@@ -175,6 +179,9 @@ private struct StorageNoticeBanner: View {
     }
 }
 
+/// All the rows that belong inside a provider's Section. Returned as a
+/// `Group` so the parent `Section` shows them as discrete rows rather
+/// than collapsing them into one nested view.
 private struct ProviderRows: View {
     let status: SyncStatus
     let resyncInFlight: Bool
@@ -219,6 +226,19 @@ private struct ProviderRows: View {
 
 }
 
+/// Format a sync timestamp as a short relative string.
+/// Special-cases sub-3-second intervals to "Just now" — `RelativeDateTimeFormatter`
+/// with `.abbreviated` rounds tiny positive past intervals into "in 0s" right
+/// after a sync writes `lastSuccess = .now`, which reads as "in the future".
+public func relativeSyncTime(from date: Date?, now: Date = .now) -> String {
+    guard let date else { return "Never" }
+    let interval = now.timeIntervalSince(date)
+    if interval < 3 { return "Just now" }
+    let f = RelativeDateTimeFormatter()
+    f.unitsStyle = .abbreviated
+    return f.localizedString(for: date, relativeTo: now)
+}
+
 private struct ProviderErrorRow: View {
     let error: String
 
@@ -237,10 +257,44 @@ private struct ProviderErrorRow: View {
             HStack {
                 Spacer()
                 Button("Copy Error") {
+                    #if os(macOS)
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(error, forType: .string)
+                    #else
                     UIPasteboard.general.string = error
+                    #endif
                 }
                 .controlSize(.small)
             }
         }
     }
+}
+
+@MainActor
+private func makeSyncSettingsPreviewHost() -> some View {
+    let storage = try! StorageFactory.makeItemStorage(inMemory: true)
+    let repo = Repository(storage: storage)
+    let coordinator = SyncCoordinator(applier: repo)
+    coordinator.register(NoopRemoteAdapter(providerId: CloudKitConfig.providerId, displayName: "iCloud"))
+    coordinator.setEnabled(true, for: CloudKitConfig.providerId)
+    let settings = AppSettings()
+    let watcher = CloudKitAccountWatcher(
+        containerIdentifier: CloudKitConfig.containerIdentifier,
+        coordinator: coordinator,
+        preference: settings
+    )
+    let health = StorageHealth(notice: .rescued(
+        itemCount: 42,
+        originalError: "loadIssueModelContainer"
+    ))
+    return SyncSettingsView()
+        .environment(repo)
+        .environment(coordinator)
+        .environment(settings)
+        .environment(watcher)
+        .environment(health)
+}
+
+#Preview {
+    makeSyncSettingsPreviewHost()
 }
