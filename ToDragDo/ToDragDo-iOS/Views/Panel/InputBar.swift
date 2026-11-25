@@ -70,7 +70,7 @@ struct InputBar: View {
             if !state.pendingAttachments.isEmpty {
                 FlowLayout(spacing: 6) {
                     ForEach(Array(state.pendingAttachments.enumerated()), id: \.offset) { index, attachment in
-                        AttachmentChip(attachment: attachment) {
+                        AttachmentChip(attachment: attachment, maxLabelWidth: 220) {
                             state.pendingAttachments.remove(at: index)
                         }
                     }

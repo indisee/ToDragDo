@@ -1,11 +1,8 @@
 import Foundation
 import Observation
+import ToDragDoUI
 
 /// Period the summary covers. Verbatim port from the macOS app.
-enum SummaryMode: String, CaseIterable, Hashable, Sendable {
-    case day
-    case week
-}
 
 /// Lightweight observable that the Done-summary sheet uses to track
 /// which period it's anchored on. iOS variant — same shape as macOS,

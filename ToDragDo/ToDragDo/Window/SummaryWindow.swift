@@ -1,7 +1,8 @@
 import AppKit
 import SwiftUI
-import ToDragDoCore
 import ToDragDoContentTypes
+import ToDragDoCore
+import ToDragDoUI
 
 /// On-demand `NSWindow` that hosts `SummaryView` — the "done items in
 /// this day/week" review window.

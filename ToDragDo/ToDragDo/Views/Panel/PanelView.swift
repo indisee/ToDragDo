@@ -18,6 +18,7 @@ import ToDragDoUI
 struct PanelView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(Repository.self) private var repository
+    @Environment(PanelController.self) private var panelController
 
     @State private var panelState = PanelState()
     @State private var dragSession = DragSession()
@@ -33,7 +34,7 @@ struct PanelView: View {
                     .padding(.horizontal, 12)
                 if !panelState.isListCollapsed {
                     if panelState.selectedFolder == .done && !panelState.isTrashOpen {
-                        DoneSummaryRow()
+                        DoneSummaryRow { panelController.showSummary(mode: $0) }
                             .padding(.horizontal, 12)
                     }
                     ItemList()

@@ -1,17 +1,22 @@
 import SwiftUI
 import ToDragDoCore
-import ToDragDoUI
 
-/// Row shown below the folder tabs and above the item list when the Done
-/// tab is selected. Opens a `SummaryWindow` in the requested mode.
-struct DoneSummaryRow: View {
+/// Row shown above the Done tab's item list. Tapping a pill hands the
+/// requested period to the caller, which presents the summary (a window
+/// on macOS, a sheet on iOS).
+public struct DoneSummaryRow: View {
     @Environment(\.theme) private var theme
-    @Environment(PanelController.self) private var panelController
 
-    var body: some View {
+    let onOpen: (SummaryMode) -> Void
+
+    public init(onOpen: @escaping (SummaryMode) -> Void) {
+        self.onOpen = onOpen
+    }
+
+    public var body: some View {
         HStack(spacing: 6) {
-            pill("Today") { panelController.showSummary(mode: .day) }
-            pill("Week") { panelController.showSummary(mode: .week) }
+            pill("Today") { onOpen(.day) }
+            pill("Week") { onOpen(.week) }
             Spacer(minLength: 0)
         }
     }
@@ -21,8 +26,8 @@ struct DoneSummaryRow: View {
         Button(action: action) {
             Text(label)
                 .font(.system(size: theme.captionSize, weight: .medium))
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
+                .padding(.horizontal, PlatformMetrics.pillHorizontal)
+                .padding(.vertical, PlatformMetrics.pillVertical)
                 .foregroundStyle(.primary)
                 .background(theme.accent.opacity(0.12), in: Capsule())
                 .contentShape(Capsule())

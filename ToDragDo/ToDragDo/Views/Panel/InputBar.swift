@@ -19,6 +19,7 @@ struct InputBar: View {
     @Environment(Repository.self) private var repository
     @Environment(PanelState.self) private var panelState
     @Environment(DragSession.self) private var session
+    @Environment(AppSettings.self) private var settings
 
     private var isDropping: Bool { session.target == .input }
     private var isEditing: Bool { panelState.editingItemId != nil }
@@ -54,7 +55,12 @@ struct InputBar: View {
             if !state.pendingAttachments.isEmpty {
                 FlowLayout(spacing: 6) {
                     ForEach(Array(state.pendingAttachments.enumerated()), id: \.offset) { index, attachment in
-                        AttachmentChip(attachment: attachment) {
+                        AttachmentChip(
+                            attachment: attachment,
+                            // Panel padding + InputBar padding + the chip's own badge,
+                            // remove button and spacing.
+                            maxLabelWidth: max(80, settings.panelWidth - 110)
+                        ) {
                             state.pendingAttachments.remove(at: index)
                         }
                     }

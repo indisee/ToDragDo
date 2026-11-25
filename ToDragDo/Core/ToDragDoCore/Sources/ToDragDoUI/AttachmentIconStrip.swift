@@ -5,29 +5,33 @@ import ToDragDoCore
 /// One small SF Symbol per attachment, color-keyed to its kind. Beyond
 /// `maxIcons`, the remainder collapses into a "N+" label so a row with
 /// many attachments doesn't widen unboundedly.
-struct AttachmentIconStrip: View {
+public struct AttachmentIconStrip: View {
     let attachments: [Attachment]
+
+    public init(attachments: [Attachment]) {
+        self.attachments = attachments
+    }
 
     private static let maxIcons = 2
 
-    var body: some View {
+    public var body: some View {
         if !attachments.isEmpty {
             let visible = attachments.prefix(Self.maxIcons)
             let overflow = attachments.count - visible.count
             HStack(spacing: 4) {
                 ForEach(Array(visible.enumerated()), id: \.offset) { _, attachment in
                     Image(systemName: symbol(for: attachment.kind))
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: PlatformMetrics.iconStripGlyph, weight: .semibold))
                         .foregroundStyle(color(for: attachment.kind))
-                        .frame(width: 14, height: 14)
+                        .frame(width: PlatformMetrics.iconStripFrame, height: PlatformMetrics.iconStripFrame)
                 }
                 if overflow > 0 {
                     Text("+\(overflow)")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.system(size: PlatformMetrics.iconStripGlyph, weight: .semibold))
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
-                        .frame(height: 14)
+                        .frame(height: PlatformMetrics.iconStripFrame)
                 }
             }
             .fixedSize(horizontal: true, vertical: false)

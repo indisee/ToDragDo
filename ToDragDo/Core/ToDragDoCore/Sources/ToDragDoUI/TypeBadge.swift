@@ -1,42 +1,51 @@
 import SwiftUI
 import ToDragDoContentTypes
 import ToDragDoCore
-import ToDragDoUI
 
 /// Leading per-row indicator. Two modes:
 /// - **Type**: symbol + tint resolved from the content-type registry.
 /// - **Date**: when the item has a `dueDate`, shows `dd` over `MMM` in
 ///   two lines, replacing the type symbol. Past-due dates render in red.
 ///
-/// The hardcoded `switch typeIdentifier` that used to live here moved into
-/// `ContentTypeProvider.badge(forItemTypeIdentifier:)`. Provider plugins
-/// (Jira, GitHub PR, …) ship their own glyph + tint without touching this
-/// file.
-struct TypeBadge: View {
+/// Provider plugins (Jira, GitHub PR, …) ship their own glyph + tint via
+/// `ContentTypeProvider.badge(forItemTypeIdentifier:)`.
+public struct TypeBadge: View {
     @Environment(\.theme) private var theme
     @Environment(\.contentTypes) private var contentTypes
     let typeIdentifier: String
-    var dueDate: Date? = nil
-    var calendar: Calendar = .autoupdatingCurrent
-    var now: Date = .now
+    var dueDate: Date?
+    var calendar: Calendar
+    var now: Date
 
-    var body: some View {
+    public init(
+        typeIdentifier: String,
+        dueDate: Date? = nil,
+        calendar: Calendar = .autoupdatingCurrent,
+        now: Date = .now
+    ) {
+        self.typeIdentifier = typeIdentifier
+        self.dueDate = dueDate
+        self.calendar = calendar
+        self.now = now
+    }
+
+    public var body: some View {
         if let dueDate {
             VStack(spacing: -2) {
                 Text(dueDate, format: .dateTime.day(.twoDigits))
-                    .font(.system(size: 11, weight: .bold, design: .rounded))
+                    .font(.system(size: PlatformMetrics.badgeDay, weight: .bold, design: .rounded))
                 Text(dueDate, format: .dateTime.month(.abbreviated))
-                    .font(.system(size: 9, weight: .semibold, design: .rounded))
+                    .font(.system(size: PlatformMetrics.badgeMonth, weight: .semibold, design: .rounded))
                     .textCase(.uppercase)
             }
             .foregroundStyle(isPast(dueDate) ? Color.red : .secondary)
-            .frame(width: 24, alignment: .center)
+            .frame(width: PlatformMetrics.badgeDateWidth, alignment: .center)
             .accessibilityLabel(dueDate.formatted(date: .abbreviated, time: .omitted))
         } else {
             Text(badge.symbol)
                 .font(.system(size: theme.bodySize, weight: .semibold, design: .monospaced))
                 .foregroundStyle(symbolColor)
-                .frame(width: 18, alignment: .center)
+                .frame(width: PlatformMetrics.badgeSymbolWidth, alignment: .center)
         }
     }
 

@@ -4,10 +4,6 @@ import ToDragDoUI
 
 /// Period the summary covers. Driven from the Done-tab buttons; the user
 /// then walks neighboring periods via the in-window chevrons.
-enum SummaryMode: String, CaseIterable, Hashable, Sendable {
-    case day
-    case week
-}
 
 /// Lightweight observable shared between `SummaryWindow` (which mutates
 /// it when the user clicks Today/Week again from the panel) and
