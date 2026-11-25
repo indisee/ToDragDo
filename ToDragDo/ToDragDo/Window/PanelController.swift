@@ -20,7 +20,6 @@ final class PanelController {
     private let settingsWindow: SettingsWindow
     private let summaryWindow: SummaryWindow
     private(set) var isVisible: Bool
-    private var keyMonitor: Any?
 
     init(
         repository: Repository,
@@ -101,8 +100,6 @@ final class PanelController {
             panelRef.orderFrontRegardless()
         }
         self.isVisible = true
-
-        installToggleHotkey()
     }
 
     func show() {
@@ -127,18 +124,6 @@ final class PanelController {
 
     func showSummary(mode: SummaryMode) {
         summaryWindow.show(mode: mode)
-    }
-
-    private func installToggleHotkey() {
-        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
-            guard let self else { return event }
-            let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-            guard mods == [.command, .shift],
-                  event.charactersIgnoringModifiers?.lowercased() == "h"
-            else { return event }
-            self.toggle()
-            return nil
-        }
     }
 }
 

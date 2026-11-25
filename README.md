@@ -1,36 +1,12 @@
 # ToDragDo
 
-A todo list that floats above everything else on your Mac.
-Type it, drop it, get it done today, or push it to tomorrow.
+A todo list that floats on top of your Mac.
 
-## What it does
+- **Always on top.** Above every app, even full-screen. Collapses to just the input bar.
+- **Invisible when you share your screen.** Hidden from screen sharing, recordings and screenshots.
+- **iCloud sync** across Mac, iPhone and iPad.
 
-- **Always on top.** A small borderless panel that floats above other
-  apps, including full-screen ones. Drag it anywhere. It grows and
-  shrinks with its content, and remembers which edge to keep in place
-  when you park it near the bottom of the screen.
-- **Type or drag in anything.** Text, links, files, and images all
-  become items. Links get a preview, and each content type renders its
-  own row and expanded view.
-- **Today → Tomorrow → Limbo → Done.** Every item lives in one folder.
-  Unfinished Today items roll over to Tomorrow at the end of the day,
-  and Tomorrow becomes the new Today. Limbo holds everything that's
-  "not now" and makes items blink once they've sat there too long.
-- **Fast row actions.** Move to Tomorrow or Limbo, mark done, delete,
-  or set a date that routes the item to the right folder. On iPhone,
-  swipe the row.
-- **Projects.** Colour-coded projects you can tag items with and filter by.
-- **Done summary.** See what you closed, or what's still open, for any
-  day or week.
-- **Private by default while sharing.** The panel can be hidden from
-  screen sharing, recordings, and screenshots.
-- **iCloud sync** between Mac, iPhone, and iPad with no separate
-  account, built on `CKSyncEngine`.
-- **iPhone and iPad app** with the same folders and a bottom tab bar.
-- **Widgets and shortcuts.** "Add to Today" quick-add and project list
-  widgets, Lock Screen widgets, and an App Shortcut you can put on the
-  Action Button.
-- **Light, dark, or follow the system.**
+Also: drag-n-drop anything, Today / Tomorrow / Limbo / Done with daily rollover, projects, iPhone app and widgets.
 
 ## Screenshots
 
