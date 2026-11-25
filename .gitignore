@@ -32,3 +32,6 @@ Artifacts/
 
 # Per-user Claude Code settings
 .claude/settings.local.json
+
+# Local signing team (see ToDragDo/Config/Signing.xcconfig)
+Signing.local.xcconfig

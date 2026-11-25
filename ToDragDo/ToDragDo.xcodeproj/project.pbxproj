@@ -53,6 +53,7 @@
 		A92655402FD9B7030085F688 /* ToDragDoWidgetsExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ToDragDoWidgetsExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		A92655422FD9B7030085F688 /* WidgetKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = WidgetKit.framework; path = System/Library/Frameworks/WidgetKit.framework; sourceTree = SDKROOT; };
 		A92655442FD9B7030085F688 /* SwiftUI.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = SwiftUI.framework; path = System/Library/Frameworks/SwiftUI.framework; sourceTree = SDKROOT; };
+		D1A0E0102FAEBBAD0085F688 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -137,6 +138,7 @@
 		A92643F62FAEBBAD0085F688 = {
 			isa = PBXGroup;
 			children = (
+				D1A0E0112FAEBBAD0085F688 /* Config */,
 				A92644012FAEBBAD0085F688 /* ToDragDo */,
 				A92645052FAEBBAD0085F688 /* ToDragDo-iOS */,
 				A92655462FD9B7030085F688 /* ToDragDoWidgets */,
@@ -162,6 +164,14 @@
 				A92655442FD9B7030085F688 /* SwiftUI.framework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		D1A0E0112FAEBBAD0085F688 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				D1A0E0102FAEBBAD0085F688 /* Signing.xcconfig */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -350,6 +360,7 @@
 /* Begin XCBuildConfiguration section */
 		A926440A2FAEBBAF0085F688 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = D1A0E0102FAEBBAD0085F688 /* Signing.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -413,6 +424,7 @@
 		};
 		A926440B2FAEBBAF0085F688 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = D1A0E0102FAEBBAD0085F688 /* Signing.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;

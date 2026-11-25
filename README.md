@@ -52,8 +52,17 @@ ToDragDo/
 
 ## Building
 
-Open `ToDragDo/ToDragDo.xcodeproj` and run the `ToDragDo` (macOS) or
-`ToDragDo-iOS` scheme.
+Put your Apple Developer Team ID in `ToDragDo/Config/Signing.local.xcconfig`
+(gitignored):
+
+```
+DEVELOPMENT_TEAM = ABCDE12345
+```
+
+Then open `ToDragDo/ToDragDo.xcodeproj` and run the `ToDragDo` (macOS) or
+`ToDragDo-iOS` scheme. The iCloud container and App Group identifiers are
+tied to the original team; to run with sync under your own team, change
+them in the entitlements files and `CloudKitConfig` / `AppGroup`.
 
 - **Debug** builds talk to the **Development** CloudKit environment.
 - **Release** builds talk to **Production**.
@@ -87,3 +96,7 @@ open -n ToDragDo.app --args -DemoMode
   build, schema deploys, and the Development → Production migration.
 - [REQUIREMENTS.md](REQUIREMENTS.md) and
   [REQUIREMENTS-iOS.md](REQUIREMENTS-iOS.md): product requirements.
+
+## License
+
+[MIT](LICENSE)

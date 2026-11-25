@@ -1,0 +1,12 @@
+// Project-wide base configuration (set as the base of the project's Debug
+// and Release configurations).
+//
+// Your Apple Developer Team ID is deliberately not committed. Put it in
+// Config/Signing.local.xcconfig (gitignored):
+//
+//     DEVELOPMENT_TEAM = ABCDE12345
+//
+// Without that file the project still opens and builds unsigned
+// (CODE_SIGNING_ALLOWED=NO), but signed builds and iCloud need the team.
+
+#include? "Signing.local.xcconfig"
