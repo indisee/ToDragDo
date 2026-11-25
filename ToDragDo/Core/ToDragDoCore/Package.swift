@@ -48,7 +48,7 @@ let package = Package(
         ),
         .target(
             name: "ToDragDoUI",
-            dependencies: ["ToDragDoCore", "ToDragDoContentTypes"],
+            dependencies: ["ToDragDoCore", "ToDragDoContentTypes", "ToDragDoSync", "ToDragDoIntents"],
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency"),
                 .enableUpcomingFeature("ExistentialAny")

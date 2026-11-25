@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ToDragDoUI
 
 /// Thin invisible strip at the top of the panel. Returns
 /// `mouseDownCanMoveWindow = true` so a click+drag inside it moves the

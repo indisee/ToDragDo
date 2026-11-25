@@ -1,14 +1,19 @@
-import AppKit
 import Foundation
 import ToDragDoCore
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
 /// Drives the end-of-day rollover: when the calendar day changes,
 /// everything in Today merges into Tomorrow, and Tomorrow becomes the
 /// new Today (cleared). Triggers on app launch (catching missed days
 /// while the app was closed), at the next local midnight while running,
-/// and on system wake.
+/// and when the user comes back: system wake on macOS, scene
+/// re-foreground on iOS.
 @MainActor
-final class DayRollover {
+public final class DayRollover {
     private let repository: Repository
     private let calendar: Calendar
     private let defaults: UserDefaults
@@ -17,14 +22,16 @@ final class DayRollover {
     /// this device's stale pre-sleep state.
     private let prepare: (@MainActor () async -> Void)?
     private var isRunning = false
-    private var midnightTimer: Timer?
-    private var wakeObserver: NSObjectProtocol?
+    // `nonisolated(unsafe)`: only touched on the main actor, plus once from
+    // deinit, which runs after the last main-actor reference is gone.
+    nonisolated(unsafe) private var midnightTimer: Timer?
+    nonisolated(unsafe) private var wakeObserver: (any NSObjectProtocol)?
 
-    init(
+    public init(
         repository: Repository,
         prepare: (@MainActor () async -> Void)? = nil,
         calendar: Calendar = .autoupdatingCurrent,
-        defaults: UserDefaults = .standard
+        defaults: UserDefaults = SharedDefaults.store
     ) {
         self.repository = repository
         self.prepare = prepare
@@ -35,17 +42,25 @@ final class DayRollover {
     deinit {
         midnightTimer?.invalidate()
         if let wakeObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver)
+            Self.wakeCenter.removeObserver(wakeObserver)
         }
     }
 
-    func start() {
+    #if os(macOS)
+    nonisolated private static var wakeCenter: NotificationCenter { NSWorkspace.shared.notificationCenter }
+    private static let wakeNotification = NSWorkspace.didWakeNotification
+    #else
+    nonisolated private static var wakeCenter: NotificationCenter { .default }
+    private static let wakeNotification = UIScene.willEnterForegroundNotification
+    #endif
+
+    public func start() {
         Task { @MainActor in
             await runIfNeeded()
             scheduleNextMidnight()
         }
-        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didWakeNotification,
+        wakeObserver = Self.wakeCenter.addObserver(
+            forName: Self.wakeNotification,
             object: nil,
             queue: .main
         ) { [weak self] _ in

@@ -3,30 +3,30 @@ import Foundation
 import Observation
 import ToDragDoCore
 import ToDragDoSync
-import ToDragDoUI
 
-/// User-controlled app settings, persisted via UserDefaults.
-/// Single source of truth across the panel and Settings scene.
+/// User-controlled app settings, persisted via UserDefaults
+/// (`SharedDefaults.store`). Single source of truth across the UI.
 @MainActor
 @Observable
-final class AppSettings: ICloudSyncPreference {
+public final class AppSettings: ICloudSyncPreference {
     /// Allowed range for the floating panel's width. Min just keeps the
     /// chevron + a stub of a folder tab visible; max stops a careless
     /// drag from filling the screen.
-    static let panelWidthRange: ClosedRange<CGFloat> = 220...720
-    static let defaultPanelWidth: CGFloat = 420
+    public static let panelWidthRange: ClosedRange<CGFloat> = 220...720
+    public static let defaultPanelWidth: CGFloat = 420
 
     /// Bounds for the "Days before Limbo starts to blink" stepper.
     /// Zero disables the feature entirely. Upper bound stops the
     /// stepper from running off into nonsense values.
-    static let limboBlinkDaysRange: ClosedRange<Int> = 0...90
-    static let defaultLimboBlinkDays: Int = 7
+    public static let limboBlinkDaysRange: ClosedRange<Int> = 0...90
+    public static let defaultLimboBlinkDays: Int = 7
 
-    var appearance: AppearanceMode {
+    public var appearance: AppearanceMode {
         didSet { defaults.set(appearance.rawValue, forKey: Keys.appearance) }
     }
 
-    var panelWidth: CGFloat {
+    /// Width of the floating panel. macOS only; iOS has no panel.
+    public var panelWidth: CGFloat {
         didSet {
             let clamped = Self.clamp(panelWidth)
             if clamped != panelWidth {
@@ -37,18 +37,17 @@ final class AppSettings: ICloudSyncPreference {
         }
     }
 
-    /// When true, every window the app shows is excluded from screen
-    /// captures, recordings, and screen sharing (`NSWindow.sharingType`
-    /// is forced to `.none`). Default `true` matches the original
-    /// always-on behaviour.
-    var hideFromScreenSharing: Bool {
+    /// When true, the app hides itself from screen captures, recordings
+    /// and screen sharing (`NSWindow.sharingType = .none` on macOS; the
+    /// list is hidden while `UIScreen.isCaptured` on iOS). Default `true`.
+    public var hideFromScreenSharing: Bool {
         didSet { defaults.set(hideFromScreenSharing, forKey: Keys.hideFromScreenSharing) }
     }
 
     /// User preference for iCloud sync. Defaults to `true`; the
     /// `CloudKitAccountWatcher` only flips the coordinator on when this is
     /// true *and* the iCloud account is available.
-    var iCloudSyncEnabled: Bool {
+    public var iCloudSyncEnabled: Bool {
         didSet { defaults.set(iCloudSyncEnabled, forKey: Keys.iCloudSyncEnabled) }
     }
 
@@ -59,7 +58,7 @@ final class AppSettings: ICloudSyncPreference {
     /// emit on local writes and apply on remote pulls. The per-item
     /// idle timestamp (`Item.limboEnteredAt`) still rides the item
     /// record itself; this field only carries the user's threshold.
-    var limboBlinkDays: Int {
+    public var limboBlinkDays: Int {
         didSet {
             let clamped = Self.clampLimboBlinkDays(limboBlinkDays)
             if clamped != limboBlinkDays {
@@ -81,7 +80,7 @@ final class AppSettings: ICloudSyncPreference {
     @ObservationIgnored private weak var repository: Repository?
     @ObservationIgnored private var isApplyingRemote = false
 
-    init(defaults: UserDefaults = .standard) {
+    public init(defaults: UserDefaults = SharedDefaults.store) {
         self.defaults = defaults
         let raw = defaults.string(forKey: Keys.appearance) ?? AppearanceMode.auto.rawValue
         self.appearance = AppearanceMode(rawValue: raw) ?? .auto
@@ -96,7 +95,7 @@ final class AppSettings: ICloudSyncPreference {
     /// Wires the synced settings (currently just `limboBlinkDays`) to
     /// the existing change-record pipe. Called once at launch after
     /// the `Repository` is constructed.
-    func bindToSync(_ repository: Repository) {
+    public func bindToSync(_ repository: Repository) {
         self.repository = repository
         repository.onRemoteSettings = { [weak self] snapshot, ts in
             self?.applyRemoteSettings(snapshot, at: ts)
@@ -142,7 +141,7 @@ final class AppSettings: ICloudSyncPreference {
     /// without instantiating an `AppSettings`. Used by `AppDelegate`'s
     /// window observer, which doesn't otherwise reach into the app's
     /// state graph.
-    static func hideFromScreenSharing(defaults: UserDefaults = .standard) -> Bool {
+    public static func hideFromScreenSharing(defaults: UserDefaults = SharedDefaults.store) -> Bool {
         defaults.object(forKey: Keys.hideFromScreenSharing) as? Bool ?? true
     }
 

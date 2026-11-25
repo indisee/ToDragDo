@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import ToDragDoUI
 
 /// General pane in the Settings scene. Hosts cross-cutting toggles plus
 /// the on-disk data-location display (read-only path, copy, reveal in

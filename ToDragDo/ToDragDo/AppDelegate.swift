@@ -1,4 +1,5 @@
 import AppKit
+import ToDragDoUI
 
 /// Hooks the app launch sequence to:
 /// 1. Lock the activation policy to `.accessory` (menu-bar agent, no
