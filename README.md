@@ -45,7 +45,9 @@ ToDragDo/
     ├── ToDragDoCore          models, Repository, SwiftData storage, sync core
     ├── ToDragDoSync          CloudKit adapter, environments, migration
     ├── ToDragDoContentTypes  text / URL / file / image providers
-    └── ToDragDoIntents       App Intents, App Group, deep links
+    ├── ToDragDoIntents       App Intents, App Group, deep links
+    └── ToDragDoUI            SwiftUI shared by macOS and iOS: settings,
+                              theme, app state, small views
 ```
 
 ## Building

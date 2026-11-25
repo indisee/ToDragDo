@@ -41,60 +41,41 @@ own derived state). Don't pre-pay the cost.
 
 ```
 ToDragDo/                                 (working copy root)
-├── REQUIREMENTS.md
-├── ARCHITECTURE.md
+├── README.md, ARCHITECTURE.md, ReleaseInstructions.md, REQUIREMENTS*.md
+├── scripts/                              build-prod.sh, build-dev-icloud.sh, test-build.sh
+├── docs/screenshots/
 └── ToDragDo/                             (Xcode project root)
     ├── ToDragDo.xcodeproj
-    ├── ToDragDo/                         macOS app target
-    │   ├── ToDragDoApp.swift             composes Repository at launch
-    │   ├── ContentView.swift             smoke-test view (placeholder UI)
-    │   ├── Assets.xcassets/
-    │   ├── Windows/                      (later) FloatingPanel.swift, NSPanel
-    │   ├── StatusBar/                    (later) StatusBarController.swift
-    │   ├── Services/                     (later) macOS impls of Core protocols
-    │   │   ├── MacScreenShareMonitor.swift
-    │   │   ├── MacPasteboardService.swift
-    │   │   └── MacAuthStore.swift        Keychain
-    │   └── Views/                        (later) real UI
-    │       ├── Area1DropView.swift
-    │       ├── Area2ListView.swift
-    │       ├── ItemRow.swift             matchedGeometryEffect fold/unfold
-    │       └── FolderMenuView.swift
-    │
-    └── Core/ToDragDoCore/                Swift Package, no Apple frameworks in public API
-        ├── Package.swift                 platforms: [.macOS(.v14), .iOS(.v17)]
-        ├── Sources/ToDragDoCore/
-        │   ├── Models/                   plain Codable structs
-        │   │   ├── Folder.swift
-        │   │   ├── Item.swift
-        │   │   ├── ChangeRecord.swift
-        │   │   └── DeviceID.swift
-        │   ├── Platform/
-        │   │   ├── Platform.swift        enum + .current
-        │   │   └── StorageFactory.swift  dispatch on Platform
-        │   ├── Persistence/
-        │   │   ├── ItemStorage.swift     protocol + StorageError
-        │   │   ├── Repository.swift      @MainActor @Observable, talks to ItemStorage
-        │   │   └── SwiftDataStorage/     #if canImport(SwiftData)
-        │   │       ├── SwiftDataStorage.swift
-        │   │       ├── PersistedItem.swift   internal @Model
-        │   │       ├── PersistedChange.swift internal @Model
-        │   │       └── SchemaV1.swift
-        │   ├── ContentTypes/             (later) registry + providers
-        │   ├── Scheduling/               (later) DayRolloverService
-        │   ├── Sync/
-        │   │   ├── RemoteAdapter.swift   protocol
-        │   │   ├── SyncCursor.swift
-        │   │   └── NoopRemoteAdapter.swift
-        │   └── Services/                 (later) protocol-only ScreenShare,
-        │                                 Pasteboard, AuthStore
-        └── Tests/ToDragDoCoreTests/
-            ├── InMemoryItemStorage.swift  pure-Swift test fake
-            ├── RepositoryTests.swift
-            └── ChangeLogTests.swift
+    ├── ToDragDo/                         macOS app: ToDragDoApp, AppDelegate,
+    │   ├── Window/                       FloatingPanel / PanelController, Settings & Summary windows
+    │   ├── MenuBar/                      NSStatusItem
+    │   ├── State/                        PanelState (panel-only UI state)
+    │   └── Views/{Panel,Settings,Summary}  hover-driven panel UI
+    ├── ToDragDo-iOS/                     iOS app: RootView, tab bar, swipe rows,
+    │   └── Services/                     BackgroundRefresh, ScreenCaptureMonitor
+    ├── ToDragDoWidgets/                  WidgetKit extension
+    └── Core/ToDragDoCore/                Swift package
+        └── Sources/
+            ├── ToDragDoCore/             models, Repository (+Items, +Projects,
+            │                             +Scheduling, +Sync, +Backup), SwiftData
+            │                             storage, SyncCoordinator, DemoData
+            ├── ToDragDoSync/             CloudKit adapter, environments, migration
+            ├── ToDragDoContentTypes/     text / URL / file / image providers
+            ├── ToDragDoIntents/          App Intents, App Group, deep links
+            └── ToDragDoUI/               SwiftUI shared by both apps: AppSettings,
+                                          DayRollover, DataLocation, Theme, settings
+                                          panes, small row/badge views
 ```
 
-**Rule:** `Core` never imports `AppKit` or `UIKit`. The public API
+`ToDragDoUI` holds everything the two apps render or store the same way;
+platform differences inside it are `#if os(...)` branches (row metrics in
+`Theme` / `PlatformMetrics`, App Group vs standard defaults in
+`SharedDefaults`, the settings chrome in `settingsPaneStyle`). What stays
+in the app targets is genuinely different UX: the macOS hover panel vs the
+iOS tab bar and swipe rows (`PanelState`, `RowAction`, `ItemRow`,
+`InputBar`, `ProjectBadge`, Summary views).
+
+**Rule:** the `ToDragDoCore` module never imports `AppKit` or `UIKit` (only `ToDragDoUI` and the app targets do). The public API
 imports no Apple frameworks at all (`SwiftData` is referenced *internally*
 by `SwiftDataStorage`, gated behind `#if canImport(SwiftData)`). Anything
 platform-specific lives behind a protocol in Core, with a concrete impl
