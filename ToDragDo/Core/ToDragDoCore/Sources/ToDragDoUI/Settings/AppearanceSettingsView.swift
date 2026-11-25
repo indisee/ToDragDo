@@ -1,12 +1,12 @@
 import SwiftUI
-import ToDragDoUI
 
-/// Appearance pane (More → Appearance). Drives
-/// `.preferredColorScheme(_:)` on the iOS app root.
-struct AppearanceSettingsView: View {
+/// Appearance pane (macOS Settings window; iOS More → Appearance).
+public struct AppearanceSettingsView: View {
     @Environment(AppSettings.self) private var settings
 
-    var body: some View {
+    public init() {}
+
+    public var body: some View {
         @Bindable var settings = settings
         Form {
             Section {
@@ -19,10 +19,9 @@ struct AppearanceSettingsView: View {
             } header: {
                 Text("Appearance")
             } footer: {
-                Text("Auto follows your iOS appearance.")
+                Text("Auto follows your \(PlatformCopy.systemName) appearance.")
             }
         }
-        .navigationTitle("Appearance")
-        .navigationBarTitleDisplayMode(.inline)
+        .settingsPaneStyle(title: "Appearance")
     }
 }

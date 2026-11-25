@@ -1,20 +1,21 @@
 import SwiftUI
 import ToDragDoCore
-import ToDragDoUI
 
-/// Projects pane in the Settings scene.
+/// Projects pane (macOS Settings window; iOS More → Projects).
 ///
 /// Lets the user rename, recolor, add, and delete projects. Deleting a
 /// project clears its items' assignments (they show up under "No
 /// Project" in the filter).
-struct ProjectsSettingsView: View {
+public struct ProjectsSettingsView: View {
     @Environment(Repository.self) private var repository
 
     @State private var newName: String = ""
     @State private var newColor: String = ProjectColor.palette.first ?? Project.workColorHex
     @State private var errorMessage: String?
 
-    var body: some View {
+    public init() {}
+
+    public var body: some View {
         Form {
             Section("Projects") {
                 ForEach(repository.projects) { project in
@@ -29,6 +30,7 @@ struct ProjectsSettingsView: View {
                     ColorSwatchPicker(hex: $newColor)
                     TextField("Project name", text: $newName)
                         .textFieldStyle(.roundedBorder)
+                        .submitLabel(.done)
                         .onSubmit(submitNew)
                     Button("Add", action: submitNew)
                         .disabled(trimmedNewName.isEmpty)
@@ -42,8 +44,7 @@ struct ProjectsSettingsView: View {
                 }
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
+        .settingsPaneStyle(title: "Projects")
     }
 
     private var trimmedNewName: String {
@@ -55,7 +56,7 @@ struct ProjectsSettingsView: View {
         guard !name.isEmpty else { return }
         Task {
             do {
-                try await repository.addProject(name: name, colorHex: newColor)
+                _ = try await repository.addProject(name: name, colorHex: newColor)
                 newName = ""
                 errorMessage = nil
             } catch {
@@ -117,6 +118,7 @@ private struct ProjectRow: View {
 
             TextField("", text: $draftName)
                 .textFieldStyle(.plain)
+                .submitLabel(.done)
                 .onSubmit(commitRename)
                 .onChange(of: project.name) { _, new in
                     if new != draftName { draftName = new }

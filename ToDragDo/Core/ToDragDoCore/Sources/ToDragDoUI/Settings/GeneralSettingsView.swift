@@ -1,15 +1,20 @@
-import AppKit
 import SwiftUI
-import ToDragDoUI
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
-/// General pane in the Settings scene. Hosts cross-cutting toggles plus
-/// the on-disk data-location display (read-only path, copy, reveal in
-/// Finder).
-struct GeneralSettingsView: View {
+/// General pane (macOS Settings window; iOS More → General). Hosts the
+/// screen-sharing toggle, the Limbo blink stepper, and the read-only
+/// on-disk data location (copy, plus Reveal in Finder / Share…).
+public struct GeneralSettingsView: View {
     @Environment(AppSettings.self) private var settings
     @Environment(DataLocation.self) private var dataLocation
 
-    var body: some View {
+    public init() {}
+
+    public var body: some View {
         @Bindable var settings = settings
         Form {
             Section {
@@ -17,7 +22,7 @@ struct GeneralSettingsView: View {
             } header: {
                 Text("Privacy")
             } footer: {
-                Text("Excludes every ToDragDo window from screenshots, screen recordings, and shared screens.")
+                Text(privacyFooterText)
             }
 
             Section {
@@ -49,12 +54,25 @@ struct GeneralSettingsView: View {
                 HStack {
                     Spacer()
                     Button("Copy Path", action: copyPath)
+                    #if os(macOS)
                     Button("Reveal in Finder", action: revealInFinder)
+                    #else
+                    ShareLink(item: dataLocation.resolvedDirectory) {
+                        Text("Share…")
+                    }
+                    #endif
                 }
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
+        .settingsPaneStyle(title: "General")
+    }
+
+    private var privacyFooterText: String {
+        #if os(macOS)
+        "Excludes every ToDragDo window from screenshots, screen recordings, and shared screens."
+        #else
+        "Hides the list while the device is recording, sharing the screen, or mirroring. The input bar stays visible."
+        #endif
     }
 
     private var limboValueText: String {
@@ -71,12 +89,18 @@ struct GeneralSettingsView: View {
     }
 
     private func copyPath() {
+        #if os(macOS)
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.setString(dataLocation.resolvedDirectory.path, forType: .string)
+        #else
+        UIPasteboard.general.string = dataLocation.resolvedDirectory.path
+        #endif
     }
 
+    #if os(macOS)
     private func revealInFinder() {
         NSWorkspace.shared.activateFileViewerSelecting([dataLocation.resolvedDirectory])
     }
+    #endif
 }
