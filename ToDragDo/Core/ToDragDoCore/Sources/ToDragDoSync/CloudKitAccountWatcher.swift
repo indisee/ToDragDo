@@ -14,7 +14,12 @@ import ToDragDoCore
 @MainActor
 @Observable
 public final class CloudKitAccountWatcher {
-    private let container: CKContainer
+    /// `nil` when this build has no iCloud entitlement: creating a
+    /// `CKContainer` would trap, so the provider just stays disabled.
+    private let container: CKContainer?
+    /// `false` in builds signed without the iCloud entitlement (ad-hoc,
+    /// another team). The app then keeps everything on this device.
+    public let isCloudKitAvailable: Bool
     private let coordinator: SyncCoordinator
     private let preference: any ICloudSyncPreference
     private let log = Logger.todragdo(category: "CloudKitAccount")
@@ -25,7 +30,9 @@ public final class CloudKitAccountWatcher {
         coordinator: SyncCoordinator,
         preference: any ICloudSyncPreference
     ) {
-        self.container = CKContainer(identifier: containerIdentifier)
+        let available = CloudKitAvailability.isEntitled(for: containerIdentifier)
+        self.isCloudKitAvailable = available
+        self.container = available ? CKContainer(identifier: containerIdentifier) : nil
         self.coordinator = coordinator
         self.preference = preference
         self.observer = NotificationCenter.default.addObserver(
@@ -48,6 +55,10 @@ public final class CloudKitAccountWatcher {
     /// a sync right after (e.g., on app launch).
     @discardableResult
     public func refresh() async -> Bool {
+        guard let container else {
+            coordinator.setEnabled(false, for: CloudKitConfig.providerId)
+            return false
+        }
         let status: CKAccountStatus
         do {
             status = try await container.accountStatus()

@@ -14,7 +14,7 @@ public final class CloudKitSubscriptionInstaller {
     public static let subscriptionID = "todragdo-private"
 
     private let log = Logger.todragdo(category: "CKSubscription")
-    private let container: CKContainer
+    private let containerIdentifier: String
     private let defaults: UserDefaults
     private let installedKey: String
 
@@ -22,7 +22,7 @@ public final class CloudKitSubscriptionInstaller {
         containerIdentifier: String,
         defaults: UserDefaults
     ) {
-        self.container = CKContainer(identifier: containerIdentifier)
+        self.containerIdentifier = containerIdentifier
         self.defaults = defaults
         self.installedKey = "todragdo.cloudkit.subscription.installed.\(containerIdentifier)"
     }
@@ -32,6 +32,8 @@ public final class CloudKitSubscriptionInstaller {
     /// on the network.
     public func installIfNeeded() async {
         if defaults.bool(forKey: installedKey) { return }
+        guard CloudKitAvailability.isEntitled(for: containerIdentifier) else { return }
+        let container = CKContainer(identifier: containerIdentifier)
         let subscription = CKDatabaseSubscription(subscriptionID: Self.subscriptionID)
         let notificationInfo = CKSubscription.NotificationInfo()
         // Silent push: no banner / sound / badge — just a wake to fetch.

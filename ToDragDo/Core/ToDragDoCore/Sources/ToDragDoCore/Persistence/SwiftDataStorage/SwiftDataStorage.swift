@@ -38,9 +38,11 @@ public final class SwiftDataStorage: ItemStorage {
                 cloudKitDatabase: .none
             )
         } else {
+            // Explicit URL, never SwiftData's default location: see
+            // `AppSupportDirectory`.
             config = ModelConfiguration(
                 schema: schema,
-                isStoredInMemoryOnly: false,
+                url: try SwiftDataRescue.defaultStoreURL(),
                 cloudKitDatabase: .none
             )
         }

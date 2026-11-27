@@ -27,8 +27,11 @@ public final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineD
     public nonisolated let displayName: String = "iCloud"
 
     private let log = Logger.todragdo(category: "CloudKit")
-    private let container: CKContainer
-    private let database: CKDatabase
+    private let containerIdentifier: String
+    /// Created on first use, not in `init`: `CKContainer(identifier:)`
+    /// traps without the iCloud entitlement (see `CloudKitAvailability`).
+    private lazy var container = CKContainer(identifier: containerIdentifier)
+    private lazy var database: CKDatabase = container.privateCloudDatabase
     private let stateStore: CloudKitStateStore
     private let assetDirectory: URL
 
@@ -52,8 +55,7 @@ public final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineD
         containerIdentifier: String,
         assetDirectory: URL? = nil
     ) {
-        self.container = CKContainer(identifier: containerIdentifier)
-        self.database = container.privateCloudDatabase
+        self.containerIdentifier = containerIdentifier
         self.stateStore = CloudKitStateStore()
         self.assetDirectory = assetDirectory ?? Self.makeDefaultAssetDirectory()
         super.init()
@@ -68,12 +70,7 @@ public final class CloudKitRemoteAdapter: NSObject, RemoteAdapter, CKSyncEngineD
         let fm = FileManager.default
         let base: URL
         do {
-            base = try fm.url(
-                for: .applicationSupportDirectory,
-                in: .userDomainMask,
-                appropriateFor: nil,
-                create: true
-            )
+            base = try AppSupportDirectory.url()
         } catch {
             base = fm.temporaryDirectory
         }

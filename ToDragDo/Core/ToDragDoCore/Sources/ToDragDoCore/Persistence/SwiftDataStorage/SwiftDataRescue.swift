@@ -25,17 +25,11 @@ enum SwiftDataRescue {
         let extractionError: (any Error)?
     }
 
-    /// Default SwiftData store URL inside the app's Application Support
-    /// directory. Mirrors what `ModelContainer` uses when no explicit URL
-    /// is supplied. Throws if Application Support can't be resolved.
+    /// Default store URL: `default.store` in `AppSupportDirectory`, never
+    /// SwiftData's own default, which outside the sandbox is the shared
+    /// `~/Library/Application Support`. Throws if it can't be resolved.
     static func defaultStoreURL() throws -> URL {
-        let appSupport = try FileManager.default.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        )
-        return appSupport.appendingPathComponent("default.store")
+        try AppSupportDirectory.url().appendingPathComponent("default.store")
     }
 
     /// Run the full rescue pipeline:

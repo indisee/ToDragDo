@@ -14,6 +14,7 @@ DerivedData/
 .build-prod/
 .build-prod-ios/
 .build-demo/
+.build-local/
 .build/
 
 # Per-user Xcode state (schemes, window layout, breakpoints)

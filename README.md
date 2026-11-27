@@ -27,6 +27,16 @@ Also: drag-n-drop anything, Today / Tomorrow / Limbo / Done with daily rollover,
 
 <sub>All screenshots use made-up demo data (see <a href="#demo-mode">Demo mode</a>).</sub>
 
+## Download
+
+Grab the `.dmg` from [Releases](https://github.com/indisee/ToDragDo/releases). That build
+runs on any Mac with macOS 26.1+, but keeps your list on that Mac only: iCloud
+sync needs a build signed by the app's Apple Developer team.
+
+The app isn't notarized, so macOS blocks the first launch. Run
+`xattr -cr /Applications/ToDragDo.app` once, or open it, then go to
+**System Settings → Privacy & Security** and click **Open Anyway**.
+
 ## Requirements
 
 - macOS 26.1+ / iOS 26+
@@ -72,7 +82,15 @@ them in the entitlements files and `CloudKitConfig` / `AppGroup`.
 ```
 
 builds a signed macOS Release app into `Artifacts/` and checks that it
-targets Production. Run the core tests with:
+targets Production.
+
+```bash
+./scripts/build-local.sh
+```
+
+builds the downloadable local-only app (universal, ad-hoc signed, sandboxed,
+no iCloud) plus a `.zip` and `.dmg` into `Artifacts/`. Without the iCloud
+entitlement the app skips CloudKit entirely and runs local-only. Run the core tests with:
 
 ```bash
 cd ToDragDo/Core/ToDragDoCore && swift test

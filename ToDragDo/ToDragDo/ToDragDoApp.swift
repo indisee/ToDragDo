@@ -46,11 +46,16 @@ struct ToDragDoApp: App {
         let settings = AppSettings()
         settings.bindToSync(repository)
         let coordinator = SyncCoordinator(applier: repository)
-        let cloudAdapter = CloudKitRemoteAdapter(
-            containerIdentifier: Self.iCloudContainerIdentifier
-        )
-        if !demoMode {
-            coordinator.register(cloudAdapter)
+        // A build signed without the iCloud entitlement (ad-hoc, another
+        // team) can't touch CloudKit at all: it runs local-only.
+        let cloudKitAvailable = CloudKitAvailability.isAvailable
+        if !cloudKitAvailable {
+            Self.log.notice("No iCloud entitlement; running without sync")
+        }
+        if !demoMode && cloudKitAvailable {
+            coordinator.register(CloudKitRemoteAdapter(
+                containerIdentifier: Self.iCloudContainerIdentifier
+            ))
         }
         // First launch of a Production-signed build: back up local data
         // and upload it to the (empty) Production database. No-op in
@@ -127,7 +132,7 @@ struct ToDragDoApp: App {
         // schema change. UserDefaults flag gates it so it runs once per
         // device.
         let migrationKey = "todragdo.schema.migration.inline_v1"
-        if !demoMode && !UserDefaults.standard.bool(forKey: migrationKey) {
+        if !demoMode && cloudKitAvailable && !UserDefaults.standard.bool(forKey: migrationKey) {
             Task { @MainActor [weak repository] in
                 guard let repository else { return }
                 do {

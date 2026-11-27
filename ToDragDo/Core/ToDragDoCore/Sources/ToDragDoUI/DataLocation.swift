@@ -1,12 +1,14 @@
 import Foundation
 import Observation
+import ToDragDoCore
 #if os(iOS)
 import ToDragDoIntents
 #endif
 
 /// Resolves the on-disk directory where the SwiftData store lives.
 ///
-/// macOS: the app's sandboxed `Application Support` directory.
+/// macOS: the app's `Application Support` directory, private to the app
+/// (see `AppSupportDirectory`; never the shared one outside the sandbox).
 /// iOS: `Application Support` inside the App Group container, so the
 /// app, share extension and widgets read and write the same store.
 @MainActor
@@ -20,12 +22,7 @@ public final class DataLocation {
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         self.resolvedDirectory = dir
         #else
-        if let url = try? FileManager.default.url(
-            for: .applicationSupportDirectory,
-            in: .userDomainMask,
-            appropriateFor: nil,
-            create: true
-        ) {
+        if let url = try? AppSupportDirectory.url() {
             self.resolvedDirectory = url
         } else {
             self.resolvedDirectory = URL(fileURLWithPath: NSHomeDirectory())

@@ -70,6 +70,8 @@ public enum IntentStorage {
         repository: Repository,
         container: String
     ) async {
+        // Local-only build (no iCloud entitlement): nothing to sync.
+        guard CloudKitAvailability.isEntitled(for: container) else { return }
         let assetDirectory = AppGroup.containerURL
             .appendingPathComponent("CloudKitAssets", isDirectory: true)
         let coordinator = SyncCoordinator(applier: repository, defaults: AppGroup.defaults)

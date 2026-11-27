@@ -1,4 +1,5 @@
 import Foundation
+import ToDragDoCore
 import ToDragDoSync
 
 /// Centralizes the App Group identifier so the main app, widget extension,
@@ -29,12 +30,8 @@ public enum AppGroup {
     public nonisolated static var containerURL: URL {
         FileManager.default
             .containerURL(forSecurityApplicationGroupIdentifier: identifier)
-            ?? (try? FileManager.default.url(
-                for: .applicationSupportDirectory,
-                in: .userDomainMask,
-                appropriateFor: nil,
-                create: true
-            )) ?? URL(fileURLWithPath: NSHomeDirectory())
+            ?? (try? AppSupportDirectory.url())
+            ?? URL(fileURLWithPath: NSHomeDirectory())
     }
 
     /// UserDefaults keys read/written across the App Group boundary.

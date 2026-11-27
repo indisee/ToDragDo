@@ -34,8 +34,13 @@ public struct SyncSettingsView: View {
 
             if coordinator.statuses.isEmpty {
                 Section("Providers") {
-                    Text("No sync providers configured.")
-                        .foregroundStyle(.secondary)
+                    if accountWatcher.isCloudKitAvailable {
+                        Text("No sync providers configured.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("iCloud sync isn't available in this build, so items stay on this device only.")
+                            .foregroundStyle(.secondary)
+                    }
                 }
             } else {
                 ForEach(coordinator.statuses, id: \.id) { status in
